@@ -12,7 +12,11 @@
     <a href="/">Dashboard</a>
     <a href="/add" class="active">Add</a>
     <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
     <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
 <main>
     <div class="page-header">
@@ -67,6 +71,8 @@
 </main>
 <script src="/app.js"></script>
 <script>
+    requireAuth();
+    document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
     document.getElementById('date').value = new Date().toISOString().split('T')[0];
     document.getElementById('txnForm').addEventListener('submit', async e => {
         e.preventDefault();

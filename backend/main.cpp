@@ -4,6 +4,10 @@
 #include "routes/transactions.h"
 #include "routes/ai.h"
 #include "routes/import.h"
+#include "routes/auth.h"
+#include "routes/portfolio.h"
+#include "routes/news.h"
+#include "routes/goals.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -25,6 +29,9 @@ int main() {
     // Init database
     SQLite::Database db("finance.db", SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE);
     initDB(db);
+    createUserTable(db);
+    createPortfolioTables(db);
+    createGoalsTable(db);
     std::cout << "[DB] finance.db ready\n";
 
     crow::SimpleApp app;
@@ -48,11 +55,30 @@ int main() {
     CROW_ROUTE(app, "/import")([]() {
         return serveFile("frontend/import.html", "text/html");
     });
+    CROW_ROUTE(app, "/login")([]() {
+        return serveFile("frontend/login.html", "text/html");
+    });
+    CROW_ROUTE(app, "/signup")([]() {
+        return serveFile("frontend/signup.html", "text/html");
+    });
+    CROW_ROUTE(app, "/portfolio")([]() {
+        return serveFile("frontend/portfolio.html", "text/html");
+    });
+    CROW_ROUTE(app, "/news")([]() {
+        return serveFile("frontend/news.html", "text/html");
+    });
+    CROW_ROUTE(app, "/goals")([]() {
+        return serveFile("frontend/goals.html", "text/html");
+    });
 
     // ---- API routes ----
     setupTransactionRoutes(app, db);
     setupAIRoutes(app, db);
     setupImportRoutes(app, db);
+    setupAuthRoutes(app, db);
+    setupPortfolioRoutes(app, db);
+    setupNewsRoutes(app);
+    setupGoalsRoutes(app, db);
 
     std::cout << "[Server] Running on http://localhost:8080\n";
     app.port(8080).multithreaded().run();

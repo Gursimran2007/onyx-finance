@@ -1,5 +1,20 @@
 const API = window.location.origin;
 
+// ── Auth helpers ─────────────────────────────────────
+function getToken() { return localStorage.getItem('onyx_token'); }
+function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
+}
+function requireAuth() {
+    if (!getToken()) window.location.href = '/login';
+}
+function logout() {
+    fetch('/api/auth/logout', { method:'POST', headers: authHeaders() });
+    localStorage.removeItem('onyx_token');
+    localStorage.removeItem('onyx_name');
+    window.location.href = '/login';
+}
+
 async function fetchTransactions() {
     try { return await (await fetch(`${API}/api/transactions`)).json(); }
     catch { return []; }
