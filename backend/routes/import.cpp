@@ -1,5 +1,6 @@
 #include "routes/import.h"
 #include "database/db.h"
+#include "models/user.h"
 #include "models/transaction.h"
 #include <nlohmann/json.hpp>
 #include <sstream>
@@ -117,6 +118,11 @@ void setupImportRoutes(crow::SimpleApp& app, SQLite::Database& db) {
     CROW_ROUTE(app, "/api/import/csv").methods("POST"_method)
     ([&db](const crow::request& req) {
         try {
+            int userId = 0;
+            auto auth = req.get_header_value("Authorization");
+            if (auth.size() > 7 && auth.substr(0, 7) == "Bearer ")
+                validateSession(db, auth.substr(7), userId);
+
             auto body   = json::parse(req.body);
             std::string csvData = body.value("csv", "");
             std::string bank    = body.value("bank", "generic");
@@ -189,6 +195,7 @@ void setupImportRoutes(crow::SimpleApp& app, SQLite::Database& db) {
                 if (debit == 0 && credit == 0) { skipped++; continue; }
 
                 Transaction t;
+                t.userId      = userId;
                 t.date        = normalizeDate(dateRaw);
                 t.description = desc;
                 t.category    = guessCategory(desc);

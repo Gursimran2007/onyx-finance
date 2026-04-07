@@ -16,30 +16,30 @@ function logout() {
 }
 
 async function fetchTransactions() {
-    try { return await (await fetch(`${API}/api/transactions`)).json(); }
+    try { return await (await fetch(`${API}/api/transactions`, { headers: authHeaders() })).json(); }
     catch { return []; }
 }
 async function fetchSummary() {
-    try { return await (await fetch(`${API}/api/summary`)).json(); }
+    try { return await (await fetch(`${API}/api/summary`, { headers: authHeaders() })).json(); }
     catch { return { totalIncome:0, totalExpenses:0, balance:0 }; }
 }
 async function addTransaction(data) {
     try {
         const res = await fetch(`${API}/api/transactions`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
+            method:'POST', headers: authHeaders(),
             body: JSON.stringify(data)
         });
         return res.ok;
     } catch { return false; }
 }
 async function deleteTransaction(id) {
-    try { return (await fetch(`${API}/api/transactions/${id}`, {method:'DELETE'})).ok; }
+    try { return (await fetch(`${API}/api/transactions/${id}`, { method:'DELETE', headers: authHeaders() })).ok; }
     catch { return false; }
 }
 async function askAI(question) {
     try {
         const res = await fetch(`${API}/api/ai/analyze`, {
-            method:'POST', headers:{'Content-Type':'application/json'},
+            method:'POST', headers: authHeaders(),
             body: JSON.stringify({question})
         });
         const d = await res.json();

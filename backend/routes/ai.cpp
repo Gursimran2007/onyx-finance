@@ -99,11 +99,17 @@ void setupAIRoutes(crow::SimpleApp& app, SQLite::Database& db) {
     CROW_ROUTE(app, "/api/ai/analyze").methods("POST"_method)
     ([&db](const crow::request& req) {
         try {
+            // Get userId from session
+            int userId = 0;
+            auto auth = req.get_header_value("Authorization");
+            if (auth.size() > 7 && auth.substr(0, 7) == "Bearer ")
+                validateSession(db, auth.substr(7), userId);
+
             auto body     = json::parse(req.body);
             auto question = body.value("question", "Give me a summary of my spending.");
 
-            // Grab last 30 transactions for context
-            auto txns   = getRecentTransactions(db, 30);
+            // Grab last 30 transactions for this user
+            auto txns   = getRecentTransactions(db, userId, 30);
             auto context = buildContext(txns);
 
             std::string prompt =
