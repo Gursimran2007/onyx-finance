@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Add Transaction</title>
+    <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add" class="active">Add</a>
+    <a href="/import">Import</a>
+    <a href="/chat">AI Chat</a>
+</nav>
+<main>
+    <div class="page-header">
+        <h1>Add Transaction</h1>
+        <p>Record a new income or expense</p>
+    </div>
+    <div class="form-container">
+        <div class="form-card">
+            <div id="alertBox" class="alert"></div>
+            <form id="txnForm">
+                <div class="form-section-title">Transaction Type</div>
+                <div class="form-group">
+                    <div class="type-toggle">
+                        <input type="radio" name="type" id="typeExpense" value="expense" checked/>
+                        <label for="typeExpense" class="expense-lbl">↓ Expense</label>
+                        <input type="radio" name="type" id="typeIncome" value="income"/>
+                        <label for="typeIncome" class="income-lbl">↑ Income</label>
+                    </div>
+                </div>
+                <div class="divider"></div>
+                <div class="form-section-title">Details</div>
+                <div class="form-group">
+                    <label for="amount">Amount (₹)</label>
+                    <input type="number" id="amount" placeholder="0.00" min="0.01" step="0.01" required/>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category</label>
+                    <select id="category">
+                        <option value="Food">Food & Dining</option>
+                        <option value="Rent">Rent & Housing</option>
+                        <option value="Transport">Transport</option>
+                        <option value="Salary">Salary</option>
+                        <option value="Entertainment">Entertainment</option>
+                        <option value="Health">Health & Medical</option>
+                        <option value="Shopping">Shopping</option>
+                        <option value="Utilities">Utilities & Bills</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <input type="text" id="description" placeholder="e.g. Swiggy order"/>
+                </div>
+                <div class="form-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date" required/>
+                </div>
+                <button type="submit" class="btn-primary" id="submitBtn">Add Transaction</button>
+            </form>
+        </div>
+    </div>
+</main>
+<script src="/app.js"></script>
+<script>
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('txnForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true; btn.textContent = 'Adding...';
+        const alertEl = document.getElementById('alertBox');
+        alertEl.style.display = 'none';
+        const ok = await addTransaction({
+            amount:      parseFloat(document.getElementById('amount').value),
+            category:    document.getElementById('category').value,
+            description: document.getElementById('description').value,
+            date:        document.getElementById('date').value,
+            type:        document.querySelector('input[name="type"]:checked').value
+        });
+        btn.disabled = false; btn.textContent = 'Add Transaction';
+        alertEl.className = ok ? 'alert success' : 'alert error';
+        alertEl.textContent = ok ? 'Transaction added.' : 'Failed. Try again.';
+        alertEl.style.display = 'block';
+        if (ok) { document.getElementById('txnForm').reset(); document.getElementById('date').value = new Date().toISOString().split('T')[0]; setTimeout(() => alertEl.style.display='none', 3000); }
+    });
+</script>
+</body>
+</html>
