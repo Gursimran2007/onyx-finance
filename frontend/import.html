@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Import Bank Statement</title>
+    <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import" class="active">Import</a>
+    <a href="/chat">AI Chat</a>
+</nav>
+<main>
+    <div class="page-header">
+        <h1>Import Bank Statement</h1>
+        <p>Upload a CSV from your bank — transactions are auto-categorized</p>
+    </div>
+    <div class="import-layout">
+        <div class="form-card">
+            <div class="form-section-title">Select Bank</div>
+            <div class="bank-grid">
+                <div class="bank-btn selected" data-bank="hdfc" onclick="selectBank(this)">HDFC</div>
+                <div class="bank-btn" data-bank="sbi"    onclick="selectBank(this)">SBI</div>
+                <div class="bank-btn" data-bank="icici"  onclick="selectBank(this)">ICICI</div>
+                <div class="bank-btn" data-bank="axis"   onclick="selectBank(this)">Axis</div>
+                <div class="bank-btn" data-bank="kotak"  onclick="selectBank(this)">Kotak</div>
+                <div class="bank-btn" data-bank="yes"    onclick="selectBank(this)">Yes Bank</div>
+                <div class="bank-btn" data-bank="pnb"    onclick="selectBank(this)">PNB</div>
+                <div class="bank-btn" data-bank="generic" onclick="selectBank(this)">Other</div>
+            </div>
+            <div class="divider"></div>
+            <div class="form-section-title">Upload CSV</div>
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <div class="dz-icon">↑</div>
+                <p>Click to upload or drag & drop</p>
+                <p style="margin-top:0.3rem;font-size:0.75rem">CSV files only · All Indian banks supported</p>
+                <div class="filename" id="fileName"></div>
+            </div>
+            <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleFile(this)"/>
+            <button class="btn-primary" id="importBtn" onclick="doImport()" disabled>Import Transactions</button>
+            <div class="result-card" id="resultCard">
+                <div class="result-stat"><span class="label">Imported</span><span class="val imported" id="importedCount">0</span></div>
+                <div class="result-stat"><span class="label">Skipped</span><span class="val skipped"  id="skippedCount">0</span></div>
+                <a class="result-link" href="/">View on Dashboard →</a>
+            </div>
+        </div>
+        <div class="form-card">
+            <div class="form-section-title" id="bankTitle">How to export from HDFC</div>
+            <div class="steps-list" id="bankSteps"></div>
+            <div class="divider"></div>
+            <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
+                <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
+                    Transactions are auto-tagged by merchant name —
+                    Swiggy → Food, Uber → Transport, Amazon → Shopping, and so on.
+                    You can delete and re-add any transaction to correct the category.
+                </p>
+            </div>
+        </div>
+    </div>
+</main>
+<script>
+    const API = window.location.origin;
+    let selectedBank = 'hdfc', csvContent = null;
+    const instructions = {
+        hdfc:  [['Log in to','netbanking.hdfcbank.com'],['Go to','Accounts → Account Statement'],['Select date range, click','Download'],['Format:','CSV / Excel (CSV)'],['Upload the file','here']],
+        sbi:   [['Log in to','onlinesbi.sbi'],['Go to','e-Statement → Account Statement'],['Select date range, click','Download'],['Format:','CSV'],['Upload the file','here']],
+        icici: [['Log in to','icicibank.com'],['Go to','Accounts → Account Statement'],['Click','View Statement'],['Click','Download as CSV'],['Upload the file','here']],
+        axis:  [['Log in to','axisbank.com'],['Go to','Accounts → Account Statement'],['Select date range, click','Download'],['Format:','CSV'],['Upload the file','here']],
+        generic:[['Log in to your','bank\'s net banking portal'],['Find','Account Statement / Transaction History'],['Select your','date range'],['Download as','CSV (not PDF, not Excel)'],['Upload the file','here']]
+    };
+    instructions.kotak = instructions.generic;
+    instructions.yes   = instructions.generic;
+    instructions.pnb   = instructions.generic;
+
+    function selectBank(el) {
+        document.querySelectorAll('.bank-btn').forEach(b => b.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedBank = el.dataset.bank;
+        renderSteps();
+    }
+    function renderSteps() {
+        const steps = instructions[selectedBank] || instructions.generic;
+        document.getElementById('bankTitle').textContent = `How to export from ${document.querySelector('.bank-btn.selected').textContent}`;
+        document.getElementById('bankSteps').innerHTML = steps.map(([pre,strong],i) => `
+            <div class="step-item">
+                <div class="step-num">${i+1}</div>
+                <div class="step-text">${pre} <strong>${strong}</strong></div>
+            </div>`).join('');
+    }
+    function handleFile(input) {
+        const file = input.files[0]; if (!file) return;
+        document.getElementById('fileName').textContent = file.name;
+        new FileReader().onload = e => { csvContent = e.target.result; document.getElementById('importBtn').disabled = false; };
+        const fr = new FileReader(); fr.onload = e => { csvContent = e.target.result; document.getElementById('importBtn').disabled = false; }; fr.readAsText(file);
+    }
+    const dz = document.getElementById('dropZone');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', e => {
+        e.preventDefault(); dz.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file?.name.endsWith('.csv')) {
+            document.getElementById('fileName').textContent = file.name;
+            const fr = new FileReader(); fr.onload = ev => { csvContent = ev.target.result; document.getElementById('importBtn').disabled = false; }; fr.readAsText(file);
+        }
+    });
+    async function doImport() {
+        if (!csvContent) return;
+        const btn = document.getElementById('importBtn');
+        btn.disabled = true; btn.textContent = 'Importing...';
+        try {
+            const res  = await fetch(`${API}/api/import/csv`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({csv:csvContent, bank:selectedBank}) });
+            const data = await res.json();
+            const card = document.getElementById('resultCard');
+            if (data.error) { card.innerHTML = `<p style="color:var(--expense);font-size:0.85rem">Error: ${data.error}</p>`; }
+            else { document.getElementById('importedCount').textContent = data.imported; document.getElementById('skippedCount').textContent = data.skipped; }
+            card.className = 'result-card ' + (data.error ? 'error' : 'success');
+            card.style.display = 'block';
+        } catch { alert('Could not reach server.'); }
+        btn.disabled = false; btn.textContent = 'Import Transactions';
+    }
+    renderSteps();
+</script>
+</body>
+</html>

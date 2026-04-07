@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — AI Chat</title>
+    <link rel="stylesheet" href="/style.css"/>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/chat" class="active">AI Chat</a>
+</nav>
+<main style="height:calc(100vh - 60px);padding-top:1.5rem;padding-bottom:0;display:flex;flex-direction:column">
+    <div class="chat-layout" style="flex:1">
+        <div class="chat-header">
+            <div class="status-dot"></div>
+            <div class="chat-header-info">
+                <h2>Onyx AI</h2>
+                <p>Powered by Llama 3.3 · Sees your transactions</p>
+            </div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="msg bot fade-in">
+                <div class="bubble">Hey. I'm your finance AI.
+
+I can see all your transactions and help with:
+• Spending breakdowns & patterns
+• Saving strategies
+• Budget advice
+• Monthly summaries
+
+What do you want to know?</div>
+                <div class="time">Now</div>
+            </div>
+        </div>
+        <div class="suggestions">
+            <button class="sug-btn" onclick="send(this.textContent)">Where am I overspending?</button>
+            <button class="sug-btn" onclick="send(this.textContent)">Give me saving tips</button>
+            <button class="sug-btn" onclick="send(this.textContent)">Summarize this month</button>
+            <button class="sug-btn" onclick="send(this.textContent)">Biggest expense category?</button>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="Ask anything about your finances..."
+                   onkeydown="if(event.key==='Enter')send()"/>
+            <button class="btn-send" id="sendBtn" onclick="send()">Send</button>
+        </div>
+    </div>
+</main>
+<script src="/app.js"></script>
+<script>
+    const msgs = document.getElementById('chatMessages');
+
+    function time() {
+        return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    }
+    function append(text, role) {
+        const d = document.createElement('div');
+        d.className = `msg ${role} fade-in`;
+        d.innerHTML = `<div class="bubble">${text}</div><div class="time">${time()}</div>`;
+        msgs.appendChild(d);
+        msgs.scrollTop = msgs.scrollHeight;
+        return d;
+    }
+    function typing() {
+        const d = document.createElement('div');
+        d.className = 'msg bot fade-in';
+        d.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+        msgs.appendChild(d);
+        msgs.scrollTop = msgs.scrollHeight;
+        return d;
+    }
+    async function send(text) {
+        const input = document.getElementById('chatInput');
+        const btn   = document.getElementById('sendBtn');
+        const q = text || input.value.trim();
+        if (!q) return;
+        input.value = '';
+        btn.disabled = true;
+        append(q, 'user');
+        const t = typing();
+        const reply = await askAI(q);
+        t.remove();
+        append(reply, 'bot');
+        btn.disabled = false;
+        input.focus();
+    }
+</script>
+</body>
+</html>

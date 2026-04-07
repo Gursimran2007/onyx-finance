@@ -1,0 +1,9 @@
+build/
+finance.db
+.env
+*.o
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
