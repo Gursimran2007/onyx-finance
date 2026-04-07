@@ -74,16 +74,40 @@
 
     async function loadNews() {
         try {
-            const res  = await fetch('/api/news');
+            const res  = await fetch('/api/news', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') } });
             const data = await res.json();
             const list = document.getElementById('newsList');
-            if (!data.length) { list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No news available. Set NEWS_API_KEY for live feed.</p>'; return; }
-            list.innerHTML = data.map(n => `
-                <a class="news-card fade-in" href="${n.url || '#'}" target="_blank" rel="noopener">
-                    <div class="news-source">${n.source || 'Business News'} · ${timeAgo(n.publishedAt)}</div>
+            if (!data.length) { list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No news available.</p>'; return; }
+
+            // Separate portfolio news from general
+            const portfolio = data.filter(n => n.portfolioTag);
+            const general   = data.filter(n => !n.portfolioTag);
+
+            let html = '';
+
+            if (portfolio.length) {
+                html += `<div style="font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem;padding:0 0.2rem">Your Portfolio</div>`;
+                html += portfolio.map(n => `
+                    <a class="news-card fade-in" href="${n.url||'#'}" target="_blank" rel="noopener" style="border-color:rgba(226,232,240,0.12)">
+                        <div class="news-source" style="display:flex;align-items:center;gap:0.5rem">
+                            <span style="padding:0.1rem 0.5rem;background:rgba(226,232,240,0.08);border:1px solid rgba(226,232,240,0.15);border-radius:4px;font-size:0.65rem;font-weight:700;color:var(--text-primary)">${n.portfolioTag}</span>
+                            ${n.source||''} · ${timeAgo(n.publishedAt)}
+                        </div>
+                        <div class="news-title">${n.title}</div>
+                        <div class="news-desc">${n.description||''}</div>
+                    </a>`).join('');
+                html += `<div style="height:1px;background:var(--border);margin:0.5rem 0"></div>`;
+                html += `<div style="font-size:0.68rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem;padding:0 0.2rem">General</div>`;
+            }
+
+            html += general.map(n => `
+                <a class="news-card fade-in" href="${n.url||'#'}" target="_blank" rel="noopener">
+                    <div class="news-source">${n.source||'Business News'} · ${timeAgo(n.publishedAt)}</div>
                     <div class="news-title">${n.title}</div>
-                    <div class="news-desc">${n.description || ''}</div>
+                    <div class="news-desc">${n.description||''}</div>
                 </a>`).join('');
+
+            list.innerHTML = html;
         } catch { document.getElementById('newsList').innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">Could not load news.</p>'; }
     }
 
