@@ -10,6 +10,7 @@ void initDB(SQLite::Database& db) {
     db.exec(
         "CREATE TABLE IF NOT EXISTS transactions ("
         "id          INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "user_id     INTEGER NOT NULL DEFAULT 0,"
         "amount      REAL    NOT NULL,"
         "category    TEXT    NOT NULL DEFAULT 'Other',"
         "description TEXT    NOT NULL DEFAULT '',"
@@ -17,77 +18,86 @@ void initDB(SQLite::Database& db) {
         "type        TEXT    NOT NULL DEFAULT 'expense'"
         ");"
     );
+    // Add user_id column to existing DBs that don't have it
+    try { db.exec("ALTER TABLE transactions ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0;"); } catch (...) {}
 }
 
 void insertTransaction(SQLite::Database& db, const Transaction& t) {
     SQLite::Statement q(db,
-        "INSERT INTO transactions (amount, category, description, date, type) "
-        "VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO transactions (user_id, amount, category, description, date, type) "
+        "VALUES (?, ?, ?, ?, ?, ?)"
     );
-    q.bind(1, t.amount);
-    q.bind(2, t.category);
-    q.bind(3, t.description);
-    q.bind(4, t.date);
-    q.bind(5, t.type);
+    q.bind(1, t.userId);
+    q.bind(2, t.amount);
+    q.bind(3, t.category);
+    q.bind(4, t.description);
+    q.bind(5, t.date);
+    q.bind(6, t.type);
     q.exec();
 }
 
-std::vector<Transaction> getAllTransactions(SQLite::Database& db) {
+std::vector<Transaction> getAllTransactions(SQLite::Database& db, int userId) {
     std::vector<Transaction> results;
     SQLite::Statement q(db,
-        "SELECT id, amount, category, description, date, type "
-        "FROM transactions ORDER BY date DESC, id DESC"
+        "SELECT id, user_id, amount, category, description, date, type "
+        "FROM transactions WHERE user_id = ? ORDER BY date DESC, id DESC"
     );
+    q.bind(1, userId);
     while (q.executeStep()) {
         Transaction t;
         t.id          = q.getColumn(0).getInt();
-        t.amount      = q.getColumn(1).getDouble();
-        t.category    = q.getColumn(2).getString();
-        t.description = q.getColumn(3).getString();
-        t.date        = q.getColumn(4).getString();
-        t.type        = q.getColumn(5).getString();
+        t.userId      = q.getColumn(1).getInt();
+        t.amount      = q.getColumn(2).getDouble();
+        t.category    = q.getColumn(3).getString();
+        t.description = q.getColumn(4).getString();
+        t.date        = q.getColumn(5).getString();
+        t.type        = q.getColumn(6).getString();
         results.push_back(t);
     }
     return results;
 }
 
-std::vector<Transaction> getRecentTransactions(SQLite::Database& db, int limit) {
+std::vector<Transaction> getRecentTransactions(SQLite::Database& db, int userId, int limit) {
     std::vector<Transaction> results;
     SQLite::Statement q(db,
-        "SELECT id, amount, category, description, date, type "
-        "FROM transactions ORDER BY date DESC, id DESC LIMIT ?"
+        "SELECT id, user_id, amount, category, description, date, type "
+        "FROM transactions WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?"
     );
-    q.bind(1, limit);
+    q.bind(1, userId);
+    q.bind(2, limit);
     while (q.executeStep()) {
         Transaction t;
         t.id          = q.getColumn(0).getInt();
-        t.amount      = q.getColumn(1).getDouble();
-        t.category    = q.getColumn(2).getString();
-        t.description = q.getColumn(3).getString();
-        t.date        = q.getColumn(4).getString();
-        t.type        = q.getColumn(5).getString();
+        t.userId      = q.getColumn(1).getInt();
+        t.amount      = q.getColumn(2).getDouble();
+        t.category    = q.getColumn(3).getString();
+        t.description = q.getColumn(4).getString();
+        t.date        = q.getColumn(5).getString();
+        t.type        = q.getColumn(6).getString();
         results.push_back(t);
     }
     return results;
 }
 
-void deleteTransaction(SQLite::Database& db, int id) {
-    SQLite::Statement q(db, "DELETE FROM transactions WHERE id = ?");
+void deleteTransaction(SQLite::Database& db, int id, int userId) {
+    SQLite::Statement q(db, "DELETE FROM transactions WHERE id = ? AND user_id = ?");
     q.bind(1, id);
+    q.bind(2, userId);
     q.exec();
 }
 
-Summary getSummary(SQLite::Database& db) {
+Summary getSummary(SQLite::Database& db, int userId) {
     Summary s{0, 0, 0};
-
     SQLite::Statement inc(db,
-        "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='income'"
+        "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE user_id = ? AND type='income'"
     );
+    inc.bind(1, userId);
     if (inc.executeStep()) s.totalIncome = inc.getColumn(0).getDouble();
 
     SQLite::Statement exp(db,
-        "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE type='expense'"
+        "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE user_id = ? AND type='expense'"
     );
+    exp.bind(1, userId);
     if (exp.executeStep()) s.totalExpenses = exp.getColumn(0).getDouble();
 
     s.balance = s.totalIncome - s.totalExpenses;

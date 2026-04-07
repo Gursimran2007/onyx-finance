@@ -12,22 +12,22 @@ void initDB(SQLite::Database& db);
 // Insert a new transaction
 void insertTransaction(SQLite::Database& db, const Transaction& t);
 
-// Get all transactions (most recent first)
-std::vector<Transaction> getAllTransactions(SQLite::Database& db);
+// Get all transactions for a user (most recent first)
+std::vector<Transaction> getAllTransactions(SQLite::Database& db, int userId);
 
-// Get last N transactions (for AI context)
-std::vector<Transaction> getRecentTransactions(SQLite::Database& db, int limit = 30);
+// Get last N transactions for a user (for AI context)
+std::vector<Transaction> getRecentTransactions(SQLite::Database& db, int userId, int limit = 30);
 
-// Delete a transaction by ID
-void deleteTransaction(SQLite::Database& db, int id);
+// Delete a transaction by ID (scoped to user)
+void deleteTransaction(SQLite::Database& db, int id, int userId);
 
-// Get summary: total income, total expenses, balance
+// Get summary for a user
 struct Summary {
     double totalIncome;
     double totalExpenses;
     double balance;
 };
-Summary getSummary(SQLite::Database& db);
+Summary getSummary(SQLite::Database& db, int userId);
 
 // User management
 void createUserTable(SQLite::Database& db);

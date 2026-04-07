@@ -3,6 +3,7 @@
 
 struct Transaction {
     int id;
+    int userId;             // owner
     double amount;          // positive = income, negative = expense
     std::string category;   // Food, Rent, Salary, Transport, Other
     std::string description;
