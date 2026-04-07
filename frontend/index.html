@@ -13,14 +13,17 @@
     <a href="/" class="active">Dashboard</a>
     <a href="/add">Add</a>
     <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
     <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
 <main>
     <div class="page-header">
         <h1>Overview</h1>
         <p id="dateLabel"></p>
     </div>
-
     <div class="cards">
         <div class="card income">
             <div class="card-icon">↑</div>
@@ -41,7 +44,6 @@
             <div class="sub">Net position</div>
         </div>
     </div>
-
     <div class="charts-row">
         <div class="chart-card">
             <h3>Spending by Category</h3>
@@ -57,7 +59,6 @@
             </div>
         </div>
     </div>
-
     <div class="section-header">
         <h3>Recent Transactions</h3>
         <a href="/add">+ Add new</a>
@@ -66,12 +67,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Category</th>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th></th>
+                    <th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th></th>
                 </tr>
             </thead>
             <tbody id="txnBody">
@@ -82,6 +78,8 @@
 </main>
 <script src="/app.js"></script>
 <script>
+    requireAuth();
+    document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
     document.getElementById('dateLabel').textContent =
         new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     loadDashboard();

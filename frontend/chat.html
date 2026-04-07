@@ -12,7 +12,11 @@
     <a href="/">Dashboard</a>
     <a href="/add">Add</a>
     <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
     <a href="/chat" class="active">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
 <main style="height:calc(100vh - 60px);padding-top:1.5rem;padding-bottom:0;display:flex;flex-direction:column">
     <div class="chat-layout" style="flex:1">
@@ -29,8 +33,9 @@
 
 I can see all your transactions and help with:
 • Spending breakdowns & patterns
-• Saving strategies
-• Budget advice
+• Saving strategies & budget advice
+• Tax estimates
+• Portfolio suggestions
 • Monthly summaries
 
 What do you want to know?</div>
@@ -41,7 +46,8 @@ What do you want to know?</div>
             <button class="sug-btn" onclick="send(this.textContent)">Where am I overspending?</button>
             <button class="sug-btn" onclick="send(this.textContent)">Give me saving tips</button>
             <button class="sug-btn" onclick="send(this.textContent)">Summarize this month</button>
-            <button class="sug-btn" onclick="send(this.textContent)">Biggest expense category?</button>
+            <button class="sug-btn" onclick="send(this.textContent)">How much tax will I owe?</button>
+            <button class="sug-btn" onclick="send(this.textContent)">Suggest a monthly budget</button>
         </div>
         <div class="chat-input-area">
             <input type="text" id="chatInput" placeholder="Ask anything about your finances..."
@@ -52,41 +58,30 @@ What do you want to know?</div>
 </main>
 <script src="/app.js"></script>
 <script>
+    requireAuth();
+    document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
     const msgs = document.getElementById('chatMessages');
-
-    function time() {
-        return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    }
+    function time() { return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
     function append(text, role) {
         const d = document.createElement('div');
         d.className = `msg ${role} fade-in`;
         d.innerHTML = `<div class="bubble">${text}</div><div class="time">${time()}</div>`;
-        msgs.appendChild(d);
-        msgs.scrollTop = msgs.scrollHeight;
-        return d;
+        msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
     }
     function typing() {
-        const d = document.createElement('div');
-        d.className = 'msg bot fade-in';
+        const d = document.createElement('div'); d.className = 'msg bot fade-in';
         d.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
-        msgs.appendChild(d);
-        msgs.scrollTop = msgs.scrollHeight;
-        return d;
+        msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d;
     }
     async function send(text) {
         const input = document.getElementById('chatInput');
         const btn   = document.getElementById('sendBtn');
-        const q = text || input.value.trim();
-        if (!q) return;
-        input.value = '';
-        btn.disabled = true;
+        const q = text || input.value.trim(); if (!q) return;
+        input.value = ''; btn.disabled = true;
         append(q, 'user');
         const t = typing();
         const reply = await askAI(q);
-        t.remove();
-        append(reply, 'bot');
-        btn.disabled = false;
-        input.focus();
+        t.remove(); append(reply, 'bot'); btn.disabled = false; input.focus();
     }
 </script>
 </body>

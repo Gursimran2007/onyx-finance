@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Portfolio</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .portfolio-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem; }
+        .net-worth-card { grid-column:1/-1; background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:2rem; text-align:center; }
+        .net-worth-card .nw-label { font-size:0.72rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.8rem; }
+        .net-worth-card .nw-value { font-family:'JetBrains Mono',monospace; font-size:3rem; font-weight:500; color:var(--text-primary); }
+        .net-worth-card .nw-sub { color:var(--text-muted); font-size:0.82rem; margin-top:0.5rem; }
+        .breakdown { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-top:1.5rem; }
+        .breakdown-item { text-align:center; }
+        .breakdown-item .b-val { font-family:'JetBrains Mono',monospace; font-size:1.2rem; font-weight:500; }
+        .breakdown-item .b-label { font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem; letter-spacing:0.06em; text-transform:uppercase; }
+        .add-stock-row { display:grid; grid-template-columns:2fr 2fr 1fr 1fr auto; gap:0.6rem; align-items:end; margin-bottom:1.2rem; }
+        .add-stock-row input { margin-bottom:0; }
+        .btn-sm { padding:0.7rem 1rem; background:var(--text-primary); color:var(--bg-base); border:none; border-radius:10px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .btn-sm:hover { background:#cbd5e1; }
+        .stock-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr auto; gap:1rem; align-items:center; padding:1rem 1.4rem; border-top:1px solid var(--border); }
+        .stock-row:hover { background:var(--bg-hover); }
+        .stock-sym { font-weight:700; font-size:0.9rem; color:var(--text-primary); }
+        .stock-name { font-size:0.82rem; color:var(--text-muted); }
+        .stock-price { font-family:'JetBrains Mono',monospace; font-size:0.9rem; }
+        .pnl.pos { color:var(--income); }
+        .pnl.neg { color:var(--expense); }
+        .loading-price { color:var(--text-muted); font-size:0.8rem; }
+        .sip-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.5rem; }
+        .sip-inputs { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.8rem; margin-bottom:1rem; }
+        .sip-result { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1.2rem; text-align:center; }
+        .sip-result .r-val { font-family:'JetBrains Mono',monospace; font-size:1.6rem; font-weight:500; color:var(--income); }
+        .sip-result .r-label { font-size:0.75rem; color:var(--text-muted); margin-top:0.3rem; }
+        .sip-results-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.8rem; }
+    </style>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/portfolio" class="active">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
+    <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
+</nav>
+<main>
+    <div class="page-header">
+        <h1>Portfolio</h1>
+        <p>Stocks, mutual funds & net worth</p>
+    </div>
+
+    <!-- Net Worth -->
+    <div class="net-worth-card fade-in">
+        <div class="nw-label">Total Net Worth</div>
+        <div class="nw-value" id="netWorth">₹0.00</div>
+        <div class="nw-sub">Cash + Stocks + Mutual Funds</div>
+        <div class="breakdown">
+            <div class="breakdown-item">
+                <div class="b-val" id="cashBalance">₹0</div>
+                <div class="b-label">Cash Balance</div>
+            </div>
+            <div class="breakdown-item">
+                <div class="b-val" id="stockValue">₹0</div>
+                <div class="b-label">Stocks</div>
+            </div>
+            <div class="breakdown-item">
+                <div class="b-val" id="mfValue">₹0</div>
+                <div class="b-label">Mutual Funds</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stocks -->
+    <div class="section-header" style="margin-top:1.5rem">
+        <h3>Stock Holdings</h3>
+    </div>
+    <div class="form-card" style="max-width:100%;margin-bottom:1rem">
+        <div class="form-section-title">Add Stock</div>
+        <div class="add-stock-row">
+            <div class="form-group" style="margin:0"><label>Symbol (NSE)</label><input id="stockSymbol" placeholder="RELIANCE.NS"/></div>
+            <div class="form-group" style="margin:0"><label>Company Name</label><input id="stockName" placeholder="Reliance Industries"/></div>
+            <div class="form-group" style="margin:0"><label>Qty</label><input id="stockQty" type="number" placeholder="10"/></div>
+            <div class="form-group" style="margin:0"><label>Avg Buy Price (₹)</label><input id="stockAvg" type="number" placeholder="2500"/></div>
+            <button class="btn-sm" onclick="addStock()" style="margin-bottom:0;height:42px;align-self:flex-end">Add</button>
+        </div>
+    </div>
+    <div class="table-wrap" id="stocksTable">
+        <div style="padding:1rem 1.4rem;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);background:var(--bg-base);display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:1rem">
+            <span>Symbol</span><span>Qty</span><span>Avg Price</span><span>LTP</span><span>P&L</span><span></span>
+        </div>
+        <div id="stocksList"><div class="empty"><div class="empty-icon">◈</div><p>No stocks added yet</p></div></div>
+    </div>
+
+    <!-- MF -->
+    <div class="section-header" style="margin-top:1.5rem">
+        <h3>Mutual Fund NAV Lookup</h3>
+    </div>
+    <div class="form-card" style="max-width:100%;margin-bottom:1.5rem">
+        <div class="add-stock-row" style="grid-template-columns:3fr 1fr">
+            <div class="form-group" style="margin:0"><label>Scheme Code (from AMFI)</label><input id="mfCode" placeholder="e.g. 120503 (Axis Bluechip)"/></div>
+            <button class="btn-sm" onclick="lookupMF()" style="height:42px;align-self:flex-end">Look up NAV</button>
+        </div>
+        <div id="mfResult" style="display:none;margin-top:1rem;padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px;font-size:0.88rem"></div>
+    </div>
+
+    <!-- SIP Calculator -->
+    <div class="section-header">
+        <h3>SIP Calculator</h3>
+    </div>
+    <div class="sip-card">
+        <div class="sip-inputs">
+            <div class="form-group" style="margin:0"><label>Monthly SIP (₹)</label><input id="sipAmount" type="number" placeholder="5000" oninput="calcSIP()"/></div>
+            <div class="form-group" style="margin:0"><label>Expected Return (%/yr)</label><input id="sipRate" type="number" placeholder="12" oninput="calcSIP()"/></div>
+            <div class="form-group" style="margin:0"><label>Duration (years)</label><input id="sipYears" type="number" placeholder="10" oninput="calcSIP()"/></div>
+        </div>
+        <div class="sip-results-grid" id="sipResults" style="display:none">
+            <div class="sip-result"><div class="r-val" id="sipTotal">₹0</div><div class="r-label">Total Value</div></div>
+            <div class="sip-result"><div class="r-val" id="sipInvested" style="color:var(--text-secondary)">₹0</div><div class="r-label">Total Invested</div></div>
+            <div class="sip-result"><div class="r-val" id="sipGains">₹0</div><div class="r-label">Est. Gains</div></div>
+        </div>
+    </div>
+</main>
+<script src="/app.js"></script>
+<script>
+    requireAuth();
+    const token = getToken();
+    const name  = localStorage.getItem('onyx_name') || 'Account';
+    document.getElementById('userLabel').textContent = name + ' ↗';
+
+    function fmt(n) { return '₹' + Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+    async function loadPortfolio() {
+        // Cash balance from summary
+        try {
+            const s = await (await fetch('/api/summary')).json();
+            document.getElementById('cashBalance').textContent = fmt(s.balance);
+
+            // Stocks
+            const stocks = await (await fetch('/api/portfolio/stocks', { headers: authHeaders() })).json();
+            renderStocks(stocks);
+
+            // Net worth (cash + stock values — we update stock values async)
+            updateNetWorth(s.balance, 0, 0);
+        } catch(e) { console.error(e); }
+    }
+
+    function updateNetWorth(cash, stocks, mf) {
+        const total = cash + stocks + mf;
+        document.getElementById('netWorth').textContent  = fmt(total);
+        document.getElementById('stockValue').textContent = fmt(stocks);
+        document.getElementById('mfValue').textContent   = fmt(mf);
+        document.getElementById('cashBalance').textContent = fmt(cash);
+    }
+
+    function renderStocks(stocks) {
+        const el = document.getElementById('stocksList');
+        if (!stocks.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">◈</div><p>No stocks added yet</p></div>'; return; }
+        el.innerHTML = stocks.map(s => `
+            <div class="stock-row" id="stock-${s.id}">
+                <div><div class="stock-sym">${s.symbol}</div><div class="stock-name">${s.name}</div></div>
+                <div style="font-family:'JetBrains Mono',monospace">${s.qty}</div>
+                <div style="font-family:'JetBrains Mono',monospace">${fmt(s.avgPrice)}</div>
+                <div class="stock-price loading-price" id="ltp-${s.id}">Fetching...</div>
+                <div class="pnl" id="pnl-${s.id}">—</div>
+                <button class="btn-del" onclick="removeStock(${s.id})">✕</button>
+            </div>`).join('');
+
+        // Fetch live prices
+        let totalStockVal = 0;
+        let fetched = 0;
+        stocks.forEach(async s => {
+            try {
+                const r = await fetch(`/api/portfolio/price/${s.symbol}`, { headers: authHeaders() });
+                const d = await r.json();
+                if (d.price) {
+                    const ltp = d.price;
+                    const invested = s.qty * s.avgPrice;
+                    const current  = s.qty * ltp;
+                    const pnl      = current - invested;
+                    const pct      = ((pnl / invested) * 100).toFixed(2);
+                    document.getElementById(`ltp-${s.id}`).textContent = fmt(ltp);
+                    document.getElementById(`ltp-${s.id}`).classList.remove('loading-price');
+                    const pnlEl = document.getElementById(`pnl-${s.id}`);
+                    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt(pnl) + ` (${pct}%)`;
+                    pnlEl.className = 'pnl ' + (pnl >= 0 ? 'pos' : 'neg');
+                    totalStockVal += current;
+                }
+            } catch {}
+            fetched++;
+            if (fetched === stocks.length) {
+                const cash = parseFloat(document.getElementById('cashBalance').textContent.replace(/[₹,]/g,'')) || 0;
+                updateNetWorth(cash, totalStockVal, 0);
+            }
+        });
+    }
+
+    async function addStock() {
+        const sym = document.getElementById('stockSymbol').value.trim().toUpperCase();
+        const name = document.getElementById('stockName').value.trim();
+        const qty  = parseFloat(document.getElementById('stockQty').value);
+        const avg  = parseFloat(document.getElementById('stockAvg').value);
+        if (!sym || !qty || !avg) return alert('Fill all fields');
+        await fetch('/api/portfolio/stocks', {
+            method:'POST', headers: authHeaders(),
+            body: JSON.stringify({ symbol:sym, name, qty, avgPrice:avg })
+        });
+        document.getElementById('stockSymbol').value = '';
+        document.getElementById('stockName').value = '';
+        document.getElementById('stockQty').value = '';
+        document.getElementById('stockAvg').value = '';
+        loadPortfolio();
+    }
+
+    async function removeStock(id) {
+        await fetch(`/api/portfolio/stocks/${id}`, { method:'DELETE', headers: authHeaders() });
+        loadPortfolio();
+    }
+
+    async function lookupMF() {
+        const code = document.getElementById('mfCode').value.trim();
+        if (!code) return;
+        const el = document.getElementById('mfResult');
+        el.style.display = 'block';
+        el.textContent = 'Fetching NAV...';
+        try {
+            const r = await fetch(`/api/portfolio/mf/${code}`, { headers: authHeaders() });
+            const d = await r.json();
+            if (d.error) { el.textContent = 'Error: ' + d.error; return; }
+            el.innerHTML = `<strong style="color:var(--text-primary)">${d.schemeName || 'Scheme ' + code}</strong><br>
+                NAV: <span style="font-family:'JetBrains Mono',monospace;color:var(--income)">₹${d.nav}</span>
+                &nbsp;·&nbsp; Date: <span style="color:var(--text-muted)">${d.date}</span>`;
+        } catch { el.textContent = 'Could not fetch NAV.'; }
+    }
+
+    function calcSIP() {
+        const P = parseFloat(document.getElementById('sipAmount').value) || 0;
+        const r = (parseFloat(document.getElementById('sipRate').value) || 0) / 100 / 12;
+        const n = (parseFloat(document.getElementById('sipYears').value) || 0) * 12;
+        if (!P || !r || !n) { document.getElementById('sipResults').style.display='none'; return; }
+        const total    = P * (((Math.pow(1+r, n) - 1) / r) * (1+r));
+        const invested = P * n;
+        const gains    = total - invested;
+        document.getElementById('sipTotal').textContent    = fmt(total);
+        document.getElementById('sipInvested').textContent = fmt(invested);
+        document.getElementById('sipGains').textContent    = fmt(gains);
+        document.getElementById('sipResults').style.display = 'grid';
+    }
+
+    loadPortfolio();
+</script>
+</body>
+</html>
