@@ -77,7 +77,7 @@ int main() {
     setupImportRoutes(app, db);
     setupAuthRoutes(app, db);
     setupPortfolioRoutes(app, db);
-    setupNewsRoutes(app);
+    setupNewsRoutes(app, db);
     setupGoalsRoutes(app, db);
 
     std::cout << "[Server] Running on http://localhost:8080\n";
