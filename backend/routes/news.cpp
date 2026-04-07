@@ -36,30 +36,94 @@ static std::string httpGet(const std::string& url) {
     return response;
 }
 
-// Fetch news for a given query from NewsAPI
-static json fetchNews(const std::string& apiKey, const std::string& query, int pageSize = 5) {
-    std::string url = "https://newsapi.org/v2/everything?"
-                      "language=en&sortBy=publishedAt&pageSize=" + std::to_string(pageSize) +
-                      "&apiKey=" + apiKey +
-                      "&q=" + query;
-    std::string raw = httpGet(url);
+// Parse RSS XML into JSON articles (minimal parser, no external lib)
+static json parseRSS(const std::string& xml, const std::string& source, const std::string& tag = "") {
     json arr = json::array();
-    try {
-        auto parsed = json::parse(raw);
-        if (!parsed.contains("articles")) return arr;
-        for (auto& a : parsed["articles"]) {
-            if (a.value("title","") == "[Removed]") continue;
-            arr.push_back({
-                {"title",       a.value("title",       "")},
-                {"description", a.value("description", "")},
-                {"url",         a.value("url",         "")},
-                {"publishedAt", a.value("publishedAt", "")},
-                {"source",      a["source"].value("name","")},
-                {"tag",         query}
-            });
-        }
-    } catch (...) {}
+    size_t pos = 0;
+    auto extract = [&](const std::string& startTag, const std::string& endTag, size_t from) -> std::string {
+        size_t s = xml.find(startTag, from);
+        if (s == std::string::npos) return "";
+        s += startTag.size();
+        size_t e = xml.find(endTag, s);
+        if (e == std::string::npos) return "";
+        std::string val = xml.substr(s, e - s);
+        // Strip CDATA
+        if (val.rfind("<![CDATA[", 0) == 0) val = val.substr(9, val.size() - 12);
+        return val;
+    };
+
+    while ((pos = xml.find("<item>", pos)) != std::string::npos) {
+        size_t end = xml.find("</item>", pos);
+        if (end == std::string::npos) break;
+        std::string item = xml.substr(pos, end - pos);
+        std::string title = extract("<title>", "</title>", 0);
+        std::string desc  = extract("<description>", "</description>", 0);
+        std::string link  = extract("<link>", "</link>", 0);
+        std::string date  = extract("<pubDate>", "</pubDate>", 0);
+
+        // Extract from item block
+        auto exItem = [&](const std::string& st, const std::string& et) {
+            size_t s = item.find(st);
+            if (s == std::string::npos) return std::string("");
+            s += st.size();
+            size_t e = item.find(et, s);
+            if (e == std::string::npos) return std::string("");
+            std::string v = item.substr(s, e - s);
+            if (v.rfind("<![CDATA[", 0) == 0) v = v.substr(9, v.size() - 12);
+            return v;
+        };
+
+        title = exItem("<title>", "</title>");
+        desc  = exItem("<description>", "</description>");
+        link  = exItem("<link>", "</link>");
+        date  = exItem("<pubDate>", "</pubDate>");
+
+        if (title.empty() || title == source) { pos = end + 7; continue; }
+
+        json article = {
+            {"title",       title},
+            {"description", desc},
+            {"url",         link},
+            {"publishedAt", date},
+            {"source",      source}
+        };
+        if (!tag.empty()) article["portfolioTag"] = tag;
+        arr.push_back(article);
+        if ((int)arr.size() >= 6) break;
+        pos = end + 7;
+    }
     return arr;
+}
+
+// Fetch live news from free RSS feeds — no API key needed
+static json fetchLiveNews() {
+    json all = json::array();
+
+    struct Feed { std::string url; std::string source; std::string tag; };
+    std::vector<Feed> feeds = {
+        {"https://feeds.feedburner.com/ndtvprofit-latest",              "NDTV Profit",      "Markets"},
+        {"https://feeds.feedburner.com/ndtvprofit-topstories",          "NDTV Profit",      "Top Stories"},
+        {"https://www.thehindu.com/business/markets/?service=rss",      "The Hindu",        "Markets"},
+        {"https://timesofindia.indiatimes.com/rssfeeds/1898055.cms",    "Times of India",   "Business"},
+    };
+
+    for (auto& f : feeds) {
+        std::string raw = httpGet(f.url);
+        if (raw.empty()) continue;
+        auto articles = parseRSS(raw, f.source);
+        for (auto& a : articles) { a["tag"] = f.tag; all.push_back(a); }
+    }
+
+    return all;
+}
+
+// Fetch stock-specific news via Google News RSS (free, no key)
+static json fetchStockNews(const std::string& symbol, const std::string& tag) {
+    // URL encode the symbol
+    std::string query = symbol + "+stock+NSE+India";
+    std::string url = "https://news.google.com/rss/search?q=" + query + "&hl=en-IN&gl=IN&ceid=IN:en";
+    std::string raw = httpGet(url);
+    return parseRSS(raw, "Google News", tag);
 }
 
 static json getMockNews() {
@@ -100,18 +164,9 @@ void setupNewsRoutes(crow::SimpleApp& app, SQLite::Database& db) {
     });
 
     // GET /api/news
-    // Returns general Indian finance news + portfolio-specific news if user has stocks
+    // Returns live RSS news + portfolio-specific news — no API key needed
     CROW_ROUTE(app, "/api/news").methods("GET"_method)
     ([&db](const crow::request& req) {
-        const char* apiKey = std::getenv("NEWS_API_KEY");
-
-        if (!apiKey || std::string(apiKey).empty()) {
-            crow::response res(getMockNews().dump());
-            res.add_header("Content-Type", "application/json");
-            addCORS(res);
-            return res;
-        }
-
         // Get userId from session
         int userId = 0;
         auto auth = req.get_header_value("Authorization");
@@ -120,24 +175,20 @@ void setupNewsRoutes(crow::SimpleApp& app, SQLite::Database& db) {
 
         json result = json::array();
 
-        // 1. General Indian business news (always shown)
-        auto general = fetchNews(apiKey, "India stock market OR NSE OR BSE OR Sensex OR Nifty", 6);
+        // 1. Live general finance news from RSS feeds
+        auto general = fetchLiveNews();
         for (auto& a : general) result.push_back(a);
 
-        // 2. Portfolio-specific news (if user has stocks)
+        // 2. Portfolio-specific news via Google News RSS
         if (userId > 0) {
             auto symbols = getUserSymbols(db, userId);
             for (auto& sym : symbols) {
-                auto stockNews = fetchNews(apiKey, sym + " stock India", 2);
-                for (auto& a : stockNews) {
-                    // Tag it as portfolio news
-                    a["portfolioTag"] = sym;
-                    result.push_back(a);
-                }
+                auto stockNews = fetchStockNews(sym, sym);
+                for (auto& a : stockNews) result.push_back(a);
             }
         }
 
-        // 3. Fallback to mock if nothing came back
+        // 3. Fallback to mock if RSS fetch failed
         if (result.empty()) result = getMockNews();
 
         crow::response res(result.dump());
