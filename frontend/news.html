@@ -33,6 +33,9 @@
     <a href="/portfolio">Portfolio</a>
     <a href="/news" class="active">News</a>
     <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget">Budget</a>
     <a href="/chat">AI Chat</a>
     <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
@@ -74,7 +77,12 @@
 
     async function loadNews() {
         try {
-            const res  = await fetch('/api/news', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') } });
+            const res  = await fetch('/api/news?_=' + Date.now(), {
+                headers: {
+                    'Authorization': 'Bearer ' + localStorage.getItem('onyx_token'),
+                    'Cache-Control': 'no-cache'
+                }
+            });
             const data = await res.json();
             const list = document.getElementById('newsList');
             if (!data.length) { list.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;padding:1rem">No news available.</p>'; return; }
@@ -128,6 +136,8 @@
 
     loadNews();
     loadTax();
+    // Refresh news every 5 minutes
+    setInterval(loadNews, 5 * 60 * 1000);
 </script>
 </body>
 </html>

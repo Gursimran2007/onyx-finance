@@ -49,3 +49,9 @@ void insertGoal(SQLite::Database& db, int userId, const std::string& name, doubl
 std::vector<nlohmann::json> getGoals(SQLite::Database& db, int userId);
 void updateGoalSaved(SQLite::Database& db, int goalId, double saved);
 void deleteGoal(SQLite::Database& db, int goalId);
+
+// Budgets
+void createBudgetsTable(SQLite::Database& db);
+void upsertBudget(SQLite::Database& db, int userId, const std::string& category, double monthlyLimit);
+std::vector<nlohmann::json> getBudgets(SQLite::Database& db, int userId, const std::string& currentMonth);
+void deleteBudget(SQLite::Database& db, int budgetId, int userId);

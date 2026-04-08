@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Monthly Report</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <style>
+        .report-controls { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin-bottom:1.5rem; }
+        .report-controls select { background:var(--bg-card); border:1px solid var(--border); color:var(--text-primary); padding:0.5rem 0.8rem; border-radius:8px; font-size:0.85rem; cursor:pointer; }
+        .report-controls select:focus { outline:none; border-color:var(--border-mid); }
+        .btn-export { background:var(--text-primary); color:var(--bg-base); border:none; padding:0.5rem 1.2rem; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; letter-spacing:0.04em; transition:opacity 0.2s; }
+        .btn-export:hover { opacity:0.85; }
+
+        .report-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem; }
+        .rep-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.2rem; }
+        .rep-stat .label { font-size:0.72rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.4rem; }
+        .rep-stat .val   { font-family:'JetBrains Mono',monospace; font-size:1.4rem; font-weight:700; }
+        .rep-stat.income .val  { color:var(--income); }
+        .rep-stat.expense .val { color:var(--expense); }
+        .rep-stat.balance .val { color:var(--text-primary); }
+
+        .report-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.5rem; }
+        .rep-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.4rem; }
+        .rep-card h4 { font-size:0.8rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); margin-bottom:1rem; }
+
+        .cat-row { display:flex; align-items:center; gap:0.8rem; margin-bottom:0.7rem; }
+        .cat-bar-wrap { flex:1; background:var(--bg-base); border-radius:4px; height:6px; overflow:hidden; }
+        .cat-bar { height:100%; border-radius:4px; background:var(--border-mid); transition:width 0.6s ease; }
+        .cat-name { font-size:0.8rem; color:var(--text-secondary); min-width:90px; }
+        .cat-amt  { font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-primary); min-width:70px; text-align:right; }
+
+        .txn-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        .txn-table th { font-size:0.7rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); text-align:left; padding:0.5rem 0.6rem; border-bottom:1px solid var(--border); }
+        .txn-table td { padding:0.55rem 0.6rem; border-bottom:1px solid rgba(255,255,255,0.03); color:var(--text-secondary); vertical-align:middle; }
+        .txn-table td:last-child { font-family:'JetBrains Mono',monospace; text-align:right; }
+        .badge-income  { color:var(--income); }
+        .badge-expense { color:var(--expense); }
+        .cat-tag { display:inline-block; padding:0.1rem 0.45rem; background:var(--bg-base); border:1px solid var(--border); border-radius:4px; font-size:0.68rem; color:var(--text-muted); }
+
+        .month-list { display:flex; flex-direction:column; gap:0.4rem; margin-bottom:1.5rem; }
+        .month-row { display:flex; align-items:center; gap:0.8rem; padding:0.7rem 1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; }
+        .month-label { font-size:0.82rem; font-weight:600; color:var(--text-primary); min-width:120px; }
+        .month-bar-wrap { flex:1; background:var(--bg-base); border-radius:4px; height:6px; overflow:hidden; }
+        .month-bar { height:100%; border-radius:4px; }
+        .month-bar.inc { background:rgba(52,211,153,0.5); }
+        .month-bar.exp { background:rgba(248,113,113,0.5); }
+        .month-nums { font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:var(--text-muted); text-align:right; min-width:160px; }
+
+        .empty-state { text-align:center; padding:3rem; color:var(--text-muted); font-size:0.85rem; }
+
+        /* Print styles */
+        @media print {
+            nav, .report-controls, .btn-export { display:none !important; }
+            body { background:#fff !important; color:#111 !important; }
+            main { padding:0 !important; max-width:100% !important; }
+            .rep-stat, .rep-card, .month-row { background:#f8f8f8 !important; border-color:#ddd !important; }
+            .rep-stat .val, .txn-table td { color:#111 !important; }
+            .rep-stat .label, .rep-card h4, .txn-table th, .cat-name, .month-label { color:#555 !important; }
+            .rep-stat.income .val  { color:#059669 !important; }
+            .rep-stat.expense .val { color:#dc2626 !important; }
+            .txn-table td:last-child.badge-income  { color:#059669 !important; }
+            .txn-table td:last-child.badge-expense { color:#dc2626 !important; }
+            .cat-bar { background:#555 !important; }
+            .month-bar.inc { background:#059669 !important; }
+            .month-bar.exp { background:#dc2626 !important; }
+            .page-header p { color:#555 !important; }
+            @page { margin:1.5cm; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget">Budget</a>
+    <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
+</nav>
+<main>
+    <div class="page-header">
+        <h1>Monthly Report</h1>
+        <p id="reportSubtitle">Financial summary and transaction breakdown</p>
+    </div>
+
+    <div class="report-controls">
+        <select id="monthSelect" onchange="renderReport()"></select>
+        <button class="btn-export" onclick="exportPDF()">Export PDF</button>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="report-summary">
+        <div class="rep-stat income">
+            <div class="label">Income</div>
+            <div class="val" id="repIncome">₹0</div>
+        </div>
+        <div class="rep-stat expense">
+            <div class="label">Expenses</div>
+            <div class="val" id="repExpenses">₹0</div>
+        </div>
+        <div class="rep-stat balance">
+            <div class="label">Saved</div>
+            <div class="val" id="repSaved">₹0</div>
+        </div>
+    </div>
+
+    <!-- Category breakdown + All-months bar chart -->
+    <div class="report-grid">
+        <div class="rep-card">
+            <h4>Spending by Category</h4>
+            <div id="catList"></div>
+        </div>
+        <div class="rep-card">
+            <h4>Monthly Overview (All Time)</h4>
+            <div id="monthList"></div>
+        </div>
+    </div>
+
+    <!-- Transactions table -->
+    <div class="rep-card" style="margin-bottom:1.5rem">
+        <h4>Transactions — <span id="txnCount">0</span></h4>
+        <div style="overflow-x:auto">
+            <table class="txn-table">
+                <thead>
+                    <tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th></tr>
+                </thead>
+                <tbody id="repTxnBody">
+                    <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+    requireAuth();
+    document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
+
+    const fmt = v => '₹' + Math.abs(v).toLocaleString('en-IN', {minimumFractionDigits:0, maximumFractionDigits:0});
+
+    let allTxns = [];
+
+    async function loadData() {
+        try {
+            const res  = await fetch('/api/transactions', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') } });
+            allTxns    = await res.json();
+            if (!Array.isArray(allTxns)) allTxns = [];
+            populateMonths();
+            renderReport();
+        } catch {
+            document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">Could not load transactions.</td></tr>';
+        }
+    }
+
+    function populateMonths() {
+        const months = new Set();
+        allTxns.forEach(t => { if (t.date) months.add(t.date.slice(0,7)); });
+        const sorted = Array.from(months).sort().reverse();
+        const sel = document.getElementById('monthSelect');
+        sel.innerHTML = sorted.map(m => {
+            const [y, mo] = m.split('-');
+            const label = new Date(+y, +mo-1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
+            return `<option value="${m}">${label}</option>`;
+        }).join('');
+        if (sorted.length === 0) {
+            sel.innerHTML = '<option value="">No data</option>';
+        }
+    }
+
+    function renderReport() {
+        const month = document.getElementById('monthSelect').value;
+        if (!month) return;
+
+        const [y, mo] = month.split('-');
+        const monthLabel = new Date(+y, +mo-1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
+        document.getElementById('reportSubtitle').textContent = 'Report for ' + monthLabel;
+        document.title = `Onyx — ${monthLabel} Report`;
+
+        const txns = allTxns.filter(t => t.date && t.date.startsWith(month));
+        const income   = txns.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+        const expenses = txns.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+
+        document.getElementById('repIncome').textContent   = fmt(income);
+        document.getElementById('repExpenses').textContent = fmt(expenses);
+        const saved = income - expenses;
+        const savedEl = document.getElementById('repSaved');
+        savedEl.textContent = fmt(saved);
+        savedEl.style.color = saved >= 0 ? 'var(--income)' : 'var(--expense)';
+
+        // Category breakdown
+        const cats = {};
+        txns.filter(t => t.type === 'expense').forEach(t => {
+            cats[t.category] = (cats[t.category] || 0) + t.amount;
+        });
+        const catArr = Object.entries(cats).sort((a,b) => b[1]-a[1]);
+        const maxCat = catArr[0]?.[1] || 1;
+        document.getElementById('catList').innerHTML = catArr.length
+            ? catArr.map(([cat, amt]) => `
+                <div class="cat-row">
+                    <span class="cat-name">${cat}</span>
+                    <div class="cat-bar-wrap"><div class="cat-bar" style="width:${(amt/maxCat*100).toFixed(1)}%"></div></div>
+                    <span class="cat-amt">${fmt(amt)}</span>
+                </div>`).join('')
+            : '<p style="color:var(--text-muted);font-size:0.82rem">No expenses this month.</p>';
+
+        // Monthly overview (all time)
+        const byMonth = {};
+        allTxns.forEach(t => {
+            const m = t.date?.slice(0,7); if (!m) return;
+            if (!byMonth[m]) byMonth[m] = { inc:0, exp:0 };
+            if (t.type === 'income')  byMonth[m].inc += t.amount;
+            else                      byMonth[m].exp += t.amount;
+        });
+        const allMonths = Object.entries(byMonth).sort((a,b) => b[0].localeCompare(a[0])).slice(0,6);
+        const maxAmt = Math.max(...allMonths.map(([,v]) => Math.max(v.inc, v.exp)), 1);
+        document.getElementById('monthList').innerHTML = allMonths.map(([m, v]) => {
+            const [my, mm] = m.split('-');
+            const lbl = new Date(+my, +mm-1).toLocaleDateString('en-IN', { month:'short', year:'2-digit' });
+            return `<div class="month-row">
+                <span class="month-label">${lbl}</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                    <div class="month-bar-wrap"><div class="month-bar inc" style="width:${(v.inc/maxAmt*100).toFixed(1)}%"></div></div>
+                    <div class="month-bar-wrap"><div class="month-bar exp" style="width:${(v.exp/maxAmt*100).toFixed(1)}%"></div></div>
+                </div>
+                <span class="month-nums">${fmt(v.inc)} / ${fmt(v.exp)}</span>
+            </div>`;
+        }).join('');
+
+        // Transactions table
+        document.getElementById('txnCount').textContent = txns.length;
+        const sorted = [...txns].sort((a,b) => b.date.localeCompare(a.date));
+        document.getElementById('repTxnBody').innerHTML = sorted.length
+            ? sorted.map(t => `
+                <tr>
+                    <td>${t.date}</td>
+                    <td style="color:var(--text-primary)">${t.description || '—'}</td>
+                    <td><span class="cat-tag">${t.category}</span></td>
+                    <td class="${t.type === 'income' ? 'badge-income' : 'badge-expense'}">
+                        ${t.type === 'income' ? '+' : '-'}${fmt(t.amount)}
+                    </td>
+                </tr>`).join('')
+            : '<tr><td colspan="4" class="empty-state">No transactions for this month.</td></tr>';
+    }
+
+    function exportPDF() {
+        window.print();
+    }
+
+    loadData();
+</script>
+</body>
+</html>

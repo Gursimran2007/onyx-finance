@@ -14,6 +14,11 @@
     --income:  #4ade80;
     --expense: #f87171;
     --accent:  #e2e8f0;
+    --gold:    #c9963a;
+    --gold-soft: rgba(201,150,58,0.15);
+    --gold-glow: rgba(201,150,58,0.08);
+    --emerald: #34d399;
+    --emerald-soft: rgba(52,211,153,0.12);
     --glow-white: rgba(241,245,249,0.06);
     --glow-income: rgba(74,222,128,0.12);
     --glow-expense: rgba(248,113,113,0.12);
@@ -39,7 +44,8 @@ body::before {
     transform: translateX(-50%);
     width: 800px; height: 500px;
     background: radial-gradient(ellipse at center,
-        rgba(255,255,255,0.03) 0%,
+        rgba(201,150,58,0.04) 0%,
+        rgba(52,211,153,0.025) 40%,
         transparent 70%);
     pointer-events: none;
     z-index: 0;
@@ -60,12 +66,12 @@ nav {
 .logo {
     font-size: 1.2rem; font-weight: 800;
     letter-spacing: 0.15em; text-transform: uppercase;
-    background: linear-gradient(135deg, #ffffff 0%, #94a3b8 50%, #ffffff 100%);
-    background-size: 200% auto;
+    background: linear-gradient(135deg, #ffffff 0%, var(--gold) 35%, #94a3b8 60%, var(--emerald) 80%, #ffffff 100%);
+    background-size: 300% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: shimmer 4s linear infinite;
+    animation: shimmer 5s linear infinite;
     margin-right: 3rem;
     white-space: nowrap;
 }
@@ -90,8 +96,8 @@ nav a {
 }
 nav a:hover { color: var(--text-primary); }
 nav a.active {
-    color: var(--text-primary);
-    border-bottom-color: var(--text-primary);
+    color: var(--gold);
+    border-bottom-color: var(--gold);
 }
 
 /* ── MAIN ───────────────────────────────────────── */
@@ -151,7 +157,11 @@ main {
 }
 .card.income .value  { color: var(--income); }
 .card.expense .value { color: var(--expense); }
-.card.balance .value { color: var(--text-primary); }
+.card.balance .value { color: var(--gold); }
+
+.card.balance { border-color: rgba(201,150,58,0.12); }
+.card.balance:hover { border-color: rgba(201,150,58,0.28); }
+.card.balance .card-icon { color: var(--gold); opacity: 0.3; }
 
 .card .card-icon {
     position: absolute; right: 1.5rem; top: 1.5rem;
@@ -302,8 +312,8 @@ input, select {
 }
 input:focus, select:focus {
     outline: none;
-    border-color: var(--border-bright);
-    box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+    border-color: var(--emerald);
+    box-shadow: 0 0 0 3px var(--emerald-soft);
 }
 select option { background: #0d0f12; }
 
@@ -373,8 +383,8 @@ select option { background: #0d0f12; }
 
 .status-dot {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--income);
-    box-shadow: 0 0 8px var(--income);
+    background: var(--emerald);
+    box-shadow: 0 0 8px var(--emerald);
     animation: pulse-dot 2s ease-in-out infinite;
 }
 @keyframes pulse-dot {
@@ -492,7 +502,7 @@ select option { background: #0d0f12; }
     font-family: 'Inter', sans-serif;
 }
 .bank-btn:hover { border-color: var(--border-mid); color: var(--text-secondary); }
-.bank-btn.selected { border-color: var(--border-bright); color: var(--text-primary); background: var(--bg-hover); }
+.bank-btn.selected { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
 
 .drop-zone {
     border: 1px dashed var(--border-mid);
@@ -515,7 +525,7 @@ select option { background: #0d0f12; }
     border-radius: 12px; padding: 1.2rem;
     margin-top: 1rem; display: none;
 }
-.result-card.success { border-color: rgba(74,222,128,0.25); }
+.result-card.success { border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.03); }
 .result-card.error   { border-color: rgba(248,113,113,0.25); }
 .result-stat { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.85rem; }
 .result-stat:last-child { margin-bottom: 0; }

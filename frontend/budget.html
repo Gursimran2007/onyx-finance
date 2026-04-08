@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Budget Alerts</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <style>
+        /* ── Layout ──────────────────────────────────────── */
+        .budget-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        @media (max-width: 720px) {
+            .budget-layout { grid-template-columns: 1fr; }
+        }
+
+        /* ── Budget rows ─────────────────────────────────── */
+        .budget-row {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.8rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .budget-row:last-child { border-bottom: none; }
+
+        .budget-row-top {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .budget-row-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+        }
+
+        /* ── Progress bar ────────────────────────────────── */
+        .progress-wrap {
+            width: 100%;
+            height: 5px;
+            background: var(--bg-base);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 0.4rem 0;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.6s ease;
+        }
+
+        /* ── Badges ──────────────────────────────────────── */
+        .budget-badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .badge-ok {
+            background: rgba(52, 211, 153, 0.1);
+            color: var(--emerald);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+        .badge-warn {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .badge-over {
+            background: rgba(248, 113, 113, 0.1);
+            color: var(--expense);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+
+        /* ── Over-budget alert ───────────────────────────── */
+        .over-alert {
+            margin: 0.4rem 0 0.2rem;
+            padding: 0.4rem 0.7rem;
+            background: rgba(248, 113, 113, 0.06);
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--expense);
+            width: 100%;
+        }
+
+        /* ── Skeleton shimmer ────────────────────────────── */
+        .skeleton-row {
+            height: 70px;
+            background: linear-gradient(
+                90deg,
+                var(--bg-card) 25%,
+                var(--bg-hover) 50%,
+                var(--bg-card) 75%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 8px;
+            margin-bottom: 0.8rem;
+        }
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ── Delete button ───────────────────────────────── */
+        .btn-del-budget {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .btn-del-budget:hover {
+            color: var(--expense);
+            background: rgba(248, 113, 113, 0.1);
+        }
+
+        /* ── Amount display ──────────────────────────────── */
+        .budget-amounts {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* ── Summary line ────────────────────────────────── */
+        .budget-summary-line {
+            font-size: 0.73rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            letter-spacing: 0.02em;
+        }
+
+        /* ── Form note ───────────────────────────────────── */
+        .form-note {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 0.6rem;
+            line-height: 1.5;
+        }
+
+        /* ── Section title ───────────────────────────────── */
+        .budget-section-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget" class="active">Budget</a>
+    <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
+</nav>
+
+<main>
+    <div class="page-header">
+        <h1>Budget Alerts</h1>
+        <p>Monthly spending limits by category</p>
+    </div>
+
+    <div class="budget-layout">
+
+        <!-- ── Left card: Add Budget form ── -->
+        <div class="form-card">
+            <div class="budget-section-title">Set Monthly Budget</div>
+
+            <div id="budgetAlert" class="alert"></div>
+
+            <div class="form-group">
+                <label>Category</label>
+                <select id="budgetCategory">
+                    <option value="Food">Food</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Rent">Rent</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Health">Health</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Fitness">Fitness</option>
+                    <option value="Investment">Investment</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Monthly Limit</label>
+                <input id="budgetAmount" type="number" min="0" placeholder="Monthly limit in ₹"/>
+            </div>
+
+            <button class="btn-primary" onclick="setBudget()">Set Budget</button>
+
+            <p class="form-note">Updates automatically if a budget for this category already exists.</p>
+        </div>
+
+        <!-- ── Right card: Budget list ── -->
+        <div class="form-card">
+            <div class="budget-section-title" id="monthLabel">This Month — …</div>
+            <div class="budget-summary-line" id="budgetSummary">&nbsp;</div>
+
+            <div id="budgetList">
+                <!-- skeleton -->
+                <div class="skeleton-row"></div>
+                <div class="skeleton-row"></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+    requireAuth();
+    document.getElementById('userLabel').textContent =
+        (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
+
+    /* Dynamic month label */
+    document.getElementById('monthLabel').textContent =
+        'This Month — ' + new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+    /* ── Helpers ─────────────────────────────────────── */
+    function fmt(n) {
+        return '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function barColor(status) {
+        if (status === 'over')    return 'var(--expense)';
+        if (status === 'warning') return '#f59e0b';
+        return 'var(--emerald)';
+    }
+
+    function badgeClass(status) {
+        if (status === 'over')    return 'badge-over';
+        if (status === 'warning') return 'badge-warn';
+        return 'badge-ok';
+    }
+
+    function badgeLabel(status) {
+        if (status === 'over')    return 'Over Budget';
+        if (status === 'warning') return 'Near Limit';
+        return 'On Track';
+    }
+
+    /* ── Render budget list ──────────────────────────── */
+    function renderBudgets(budgets) {
+        const el = document.getElementById('budgetList');
+
+        if (!budgets.length) {
+            el.innerHTML = '<div class="empty"><div class="empty-icon">◎</div>' +
+                '<p>No budgets set yet. Add one to start tracking.</p></div>';
+            document.getElementById('budgetSummary').textContent =
+                '0 categories · 0 over budget';
+            return;
+        }
+
+        const overCount = budgets.filter(b => b.status === 'over').length;
+        document.getElementById('budgetSummary').textContent =
+            budgets.length + ' ' + (budgets.length === 1 ? 'category' : 'categories') +
+            ' · ' + overCount + ' over budget';
+
+        el.innerHTML = budgets.map(b => {
+            const pct      = Math.min(100, b.percentage || 0);
+            const color    = barColor(b.status);
+            const bClass   = badgeClass(b.status);
+            const bLabel   = badgeLabel(b.status);
+            const overBy   = b.spent - b.monthlyLimit;
+            const overHtml = b.status === 'over'
+                ? `<div class="over-alert">⚠ You've spent ${fmt(overBy)} over your limit this month</div>`
+                : '';
+
+            return `
+            <div class="budget-row fade-in">
+                <div class="budget-row-top">
+                    <div>
+                        <span style="font-weight:600;color:var(--text-primary)">${b.category}</span>
+                    </div>
+                    <div class="budget-row-meta">
+                        <span class="budget-amounts">${fmt(b.spent)} / ${fmt(b.monthlyLimit)}</span>
+                        <span class="budget-badge ${bClass}">${bLabel}</span>
+                        <button class="btn-del-budget" onclick="deleteBudget(${b.id})" title="Remove budget">×</button>
+                    </div>
+                </div>
+                <div class="progress-wrap" style="width:100%">
+                    <div class="progress-bar" style="width:${pct}%;background:${color}"></div>
+                </div>
+                ${overHtml}
+            </div>`;
+        }).join('');
+    }
+
+    /* ── Load budgets ────────────────────────────────── */
+    async function loadBudgets() {
+        try {
+            const res     = await fetch('/api/budgets', { headers: authHeaders() });
+            const budgets = await res.json();
+            renderBudgets(budgets);
+        } catch (e) {
+            console.error('Failed to load budgets', e);
+            document.getElementById('budgetList').innerHTML =
+                '<p style="color:var(--text-muted);font-size:0.8rem">Failed to load budgets.</p>';
+        }
+    }
+
+    /* ── Set budget ──────────────────────────────────── */
+    async function setBudget() {
+        const category     = document.getElementById('budgetCategory').value;
+        const monthlyLimit = parseFloat(document.getElementById('budgetAmount').value);
+        const alertEl      = document.getElementById('budgetAlert');
+
+        if (!category || isNaN(monthlyLimit) || monthlyLimit <= 0) {
+            alertEl.className = 'alert error';
+            alertEl.textContent = 'Please enter a valid amount.';
+            alertEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/budgets', {
+                method:  'POST',
+                headers: authHeaders(),
+                body:    JSON.stringify({ category, monthlyLimit })
+            });
+
+            if (!res.ok) throw new Error('Server error');
+
+            document.getElementById('budgetAmount').value = '';
+            alertEl.className  = 'alert success';
+            alertEl.textContent = 'Budget saved!';
+            alertEl.style.display = 'block';
+            setTimeout(() => { alertEl.style.display = 'none'; }, 2500);
+            loadBudgets();
+        } catch (e) {
+            console.error(e);
+            alertEl.className  = 'alert error';
+            alertEl.textContent = 'Failed to save budget.';
+            alertEl.style.display = 'block';
+        }
+    }
+
+    /* ── Delete budget ───────────────────────────────── */
+    async function deleteBudget(id) {
+        if (!confirm('Remove this budget?')) return;
+        try {
+            await fetch(`/api/budgets/${id}`, {
+                method:  'DELETE',
+                headers: authHeaders()
+            });
+            loadBudgets();
+        } catch (e) {
+            console.error('Failed to delete budget', e);
+        }
+    }
+
+    /* ── Init ────────────────────────────────────────── */
+    loadBudgets();
+</script>
+</body>
+</html>

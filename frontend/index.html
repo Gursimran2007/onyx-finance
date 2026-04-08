@@ -6,6 +6,65 @@
     <title>Onyx — Dashboard</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .news-ticker-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            height: 200px;
+            position: relative;
+        }
+        .news-ticker-wrap::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 60px;
+            background: linear-gradient(to bottom, transparent, var(--bg-card));
+            pointer-events: none;
+            z-index: 2;
+        }
+        .news-ticker {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            animation: ticker-scroll 30s linear infinite;
+            padding: 0.2rem 0;
+        }
+        .news-ticker:hover { animation-play-state: paused; }
+        @keyframes ticker-scroll {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+        .ticker-item {
+            padding: 0.75rem 1.2rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.15s;
+            text-decoration: none;
+            display: block;
+        }
+        .ticker-item:hover { background: var(--bg-hover); }
+        .ticker-source {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 0.2rem;
+        }
+        .ticker-title {
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+            font-weight: 500;
+        }
+        .ticker-loading {
+            padding: 1rem 1.2rem;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+    </style>
 </head>
 <body>
 <nav>
@@ -16,6 +75,9 @@
     <a href="/portfolio">Portfolio</a>
     <a href="/news">News</a>
     <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget">Budget</a>
     <a href="/chat">AI Chat</a>
     <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
@@ -75,6 +137,16 @@
             </tbody>
         </table>
     </div>
+    <!-- News ticker -->
+    <div class="section-header" style="margin-top:1.5rem">
+        <h3>Market News</h3>
+        <a href="/news">View all →</a>
+    </div>
+    <div class="news-ticker-wrap">
+        <div class="news-ticker" id="newsTicker">
+            <div class="ticker-loading">Loading news...</div>
+        </div>
+    </div>
 </main>
 <script src="/app.js"></script>
 <script>
@@ -83,6 +155,31 @@
     document.getElementById('dateLabel').textContent =
         new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     loadDashboard();
+
+    async function loadNewsTicker() {
+        try {
+            const res = await fetch('/api/news?_=' + Date.now(), {
+                headers: {
+                    'Authorization': 'Bearer ' + localStorage.getItem('onyx_token'),
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            const news = await res.json();
+            if (!Array.isArray(news) || !news.length) return;
+
+            // Take up to 10 items, duplicate for seamless loop
+            const items = news.slice(0, 10);
+            const doubled = [...items, ...items];
+
+            const ticker = document.getElementById('newsTicker');
+            ticker.innerHTML = doubled.map(n => `
+                <a class="ticker-item" href="${n.url || '#'}" target="_blank" rel="noopener">
+                    <div class="ticker-source">${n.source || 'News'}</div>
+                    <div class="ticker-title">${n.title || ''}</div>
+                </a>`).join('');
+        } catch {}
+    }
+    loadNewsTicker();
 </script>
 </body>
 </html>

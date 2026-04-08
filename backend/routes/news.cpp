@@ -108,7 +108,7 @@ static json fetchLiveNews() {
     };
 
     for (auto& f : feeds) {
-        std::string raw = httpGet(f.url);
+        std::string raw = httpGet(f.url + "?_t=" + std::to_string(time(nullptr)));
         if (raw.empty()) continue;
         auto articles = parseRSS(raw, f.source);
         for (auto& a : articles) { a["tag"] = f.tag; all.push_back(a); }
@@ -193,6 +193,8 @@ void setupNewsRoutes(crow::SimpleApp& app, SQLite::Database& db) {
 
         crow::response res(result.dump());
         res.add_header("Content-Type", "application/json");
+        res.add_header("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.add_header("Pragma", "no-cache");
         addCORS(res);
         return res;
     });
@@ -220,6 +222,8 @@ void setupNewsRoutes(crow::SimpleApp& app, SQLite::Database& db) {
         });
         crow::response res(arr.dump());
         res.add_header("Content-Type", "application/json");
+        res.add_header("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.add_header("Pragma", "no-cache");
         addCORS(res);
         return res;
     });
