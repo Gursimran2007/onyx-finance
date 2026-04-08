@@ -121,8 +121,10 @@
 
     async function loadTax() {
         try {
-            const res  = await fetch('/api/tax/reminders');
+            const res  = await fetch('/api/tax/reminders?_=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) throw new Error('status ' + res.status);
             const data = await res.json();
+            if (!Array.isArray(data) || !data.length) throw new Error('empty');
             document.getElementById('taxList').innerHTML = data.map(t => `
                 <div class="tax-card ${t.urgent ? 'urgent' : ''} fade-in">
                     <div class="tax-date">${t.date}</div>
@@ -131,7 +133,9 @@
                         <div class="tax-desc">${t.description}</div>
                     </div>
                 </div>`).join('');
-        } catch {}
+        } catch(e) {
+            document.getElementById('taxList').innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;padding:0.5rem">Could not load deadlines.</p>';
+        }
     }
 
     loadNews();
