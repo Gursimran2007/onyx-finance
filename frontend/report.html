@@ -150,13 +150,23 @@
 
     async function loadData() {
         try {
-            const res  = await fetch('/api/transactions', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') } });
-            allTxns    = await res.json();
+            const token = localStorage.getItem('onyx_token');
+            const res = await fetch('/api/transactions?_=' + Date.now(), {
+                headers: { 'Authorization': 'Bearer ' + token, 'Cache-Control': 'no-cache' }
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            allTxns = await res.json();
             if (!Array.isArray(allTxns)) allTxns = [];
-            populateMonths();
-            renderReport();
-        } catch {
-            document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">Could not load transactions.</td></tr>';
+            const firstMonth = populateMonths();
+            if (firstMonth) renderReport(firstMonth);
+            else {
+                document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">No transactions yet. <a href="/import" style="color:var(--gold)">Import some →</a></td></tr>';
+                document.getElementById('repIncome').textContent = '₹0';
+                document.getElementById('repExpenses').textContent = '₹0';
+                document.getElementById('repSaved').textContent = '₹0';
+            }
+        } catch(e) {
+            document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">Could not load — ' + e.message + '</td></tr>';
         }
     }
 
@@ -165,18 +175,21 @@
         allTxns.forEach(t => { if (t.date) months.add(t.date.slice(0,7)); });
         const sorted = Array.from(months).sort().reverse();
         const sel = document.getElementById('monthSelect');
+        if (sorted.length === 0) {
+            sel.innerHTML = '<option value="">No data</option>';
+            return null;
+        }
         sel.innerHTML = sorted.map(m => {
             const [y, mo] = m.split('-');
             const label = new Date(+y, +mo-1).toLocaleDateString('en-IN', { month:'long', year:'numeric' });
             return `<option value="${m}">${label}</option>`;
         }).join('');
-        if (sorted.length === 0) {
-            sel.innerHTML = '<option value="">No data</option>';
-        }
+        sel.value = sorted[0]; // explicitly set the first month
+        return sorted[0];
     }
 
-    function renderReport() {
-        const month = document.getElementById('monthSelect').value;
+    function renderReport(forceMonth) {
+        const month = forceMonth || document.getElementById('monthSelect').value;
         if (!month) return;
 
         const [y, mo] = month.split('-');

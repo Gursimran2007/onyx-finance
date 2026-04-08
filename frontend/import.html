@@ -54,6 +54,7 @@
     <div class="tab-row">
         <button class="tab-btn active" onclick="switchTab('csv',this)">Bank CSV</button>
         <button class="tab-btn"        onclick="switchTab('sms',this)">UPI SMS</button>
+        <button class="tab-btn"        onclick="switchTab('portfolio',this)">Portfolio CSV</button>
     </div>
 
     <!-- ============ CSV TAB ============ -->
@@ -146,6 +147,57 @@ Rs 1240 Debited from SBI A/c XXXX6789 on 07-03-26. Info: APOLLO PHARMACY. Avl Ba
                 <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
                     <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
                         Onyx parses UPI debit/credit alerts from all major banks and payment apps entirely on-device. Your SMS messages are never sent to any server — only the extracted transaction data is saved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ PORTFOLIO TAB ============ -->
+    <div class="tab-pane" id="tab-portfolio">
+        <div class="import-layout">
+            <div class="form-card">
+                <div class="form-section-title">Upload Portfolio CSV</div>
+                <div class="drop-zone" id="pfDropZone" onclick="document.getElementById('pfFileInput').click()">
+                    <div class="dz-icon">◈</div>
+                    <p>Click to upload or drag & drop</p>
+                    <p style="margin-top:0.3rem;font-size:0.75rem">CSV with Symbol, Name, Qty, Avg Price columns</p>
+                    <div class="filename" id="pfFileName"></div>
+                </div>
+                <input type="file" id="pfFileInput" accept=".csv" style="display:none" onchange="handlePFFile(this)"/>
+                <button class="btn-primary" id="pfImportBtn" onclick="doPFImport()" disabled>Import Portfolio</button>
+                <div class="result-card" id="pfResultCard">
+                    <div class="result-stat"><span class="label">Imported</span><span class="val imported" id="pfImportedCount">0</span></div>
+                    <div class="result-stat"><span class="label">Skipped</span><span class="val skipped" id="pfSkippedCount">0</span></div>
+                    <a class="result-link" href="/portfolio">View Portfolio →</a>
+                </div>
+                <div class="sms-preview" id="pfPreview" style="display:none;margin-top:1rem">
+                    <div class="parsed-count" id="pfCount"></div>
+                    <table><thead><tr><th>Symbol</th><th>Name</th><th>Qty</th><th>Avg Price</th></tr></thead>
+                    <tbody id="pfTableBody"></tbody></table>
+                </div>
+            </div>
+            <div class="form-card">
+                <div class="form-section-title">CSV Format</div>
+                <div class="steps-list">
+                    <div class="step-item"><div class="step-num">1</div><div class="step-text">Column 1: <strong>Symbol</strong> — e.g. RELIANCE.NS</div></div>
+                    <div class="step-item"><div class="step-num">2</div><div class="step-text">Column 2: <strong>Name</strong> — e.g. Reliance Industries</div></div>
+                    <div class="step-item"><div class="step-num">3</div><div class="step-text">Column 3: <strong>Qty</strong> — number of shares</div></div>
+                    <div class="step-item"><div class="step-num">4</div><div class="step-text">Column 4: <strong>Avg Price (₹)</strong> — your average buy price</div></div>
+                    <div class="step-item"><div class="step-num">5</div><div class="step-text">First row can be a <strong>header</strong> — it's skipped automatically</div></div>
+                </div>
+                <div class="divider"></div>
+                <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
+                    <p style="font-size:0.72rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;line-height:2">
+                        Symbol,Name,Qty,AvgPrice<br>
+                        RELIANCE.NS,Reliance Industries,10,2450<br>
+                        TCS.NS,Tata Consultancy Services,5,3800<br>
+                        HDFCBANK.NS,HDFC Bank,15,1620
+                    </p>
+                </div>
+                <div style="margin-top:1rem;padding:0.8rem 1rem;background:rgba(201,150,58,0.06);border:1px solid rgba(201,150,58,0.18);border-radius:8px">
+                    <p style="font-size:0.75rem;color:var(--gold);line-height:1.6">
+                        <strong>Tip:</strong> Download <a href="/portfolio_import.csv" style="color:var(--gold);text-decoration:underline">portfolio_import.csv</a> as a template with 15 sample stocks.
                     </p>
                 </div>
             </div>
@@ -403,6 +455,81 @@ Rs 1240 Debited from SBI A/c XXXX6789 on 07-03-26. Info: APOLLO PHARMACY. Avl Ba
     function toggleSamples() {
         const box = document.getElementById('samplesBox');
         box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // ── Portfolio CSV tab ──────────────────────────────────────────
+    let pfCsvContent = null, pfParsed = [];
+
+    const pfDz = document.getElementById('pfDropZone');
+    pfDz.addEventListener('dragover', e => { e.preventDefault(); pfDz.classList.add('dragover'); });
+    pfDz.addEventListener('dragleave', () => pfDz.classList.remove('dragover'));
+    pfDz.addEventListener('drop', e => {
+        e.preventDefault(); pfDz.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file?.name.endsWith('.csv')) {
+            document.getElementById('pfFileName').textContent = file.name;
+            const fr = new FileReader(); fr.onload = ev => { pfCsvContent = ev.target.result; parsePFCsv(); }; fr.readAsText(file);
+        }
+    });
+    function handlePFFile(input) {
+        const file = input.files[0]; if (!file) return;
+        document.getElementById('pfFileName').textContent = file.name;
+        const fr = new FileReader(); fr.onload = e => { pfCsvContent = e.target.result; parsePFCsv(); }; fr.readAsText(file);
+    }
+    function parsePFCsv() {
+        if (!pfCsvContent) return;
+        pfParsed = [];
+        const lines = pfCsvContent.split('\n').filter(l => l.trim());
+        let startIdx = 0;
+        // Skip header row if first cell looks like a label
+        const firstCell = lines[0]?.split(',')[0]?.toLowerCase().trim();
+        if (firstCell === 'symbol' || firstCell === 'ticker' || firstCell === 'stock') startIdx = 1;
+
+        for (let i = startIdx; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g,''));
+            if (cols.length < 4) continue;
+            const symbol = cols[0], name = cols[1];
+            const qty = parseFloat(cols[2]), avgPrice = parseFloat(cols[3]);
+            if (!symbol || isNaN(qty) || isNaN(avgPrice)) continue;
+            pfParsed.push({ symbol, name, qty, avgPrice });
+        }
+
+        document.getElementById('pfImportBtn').disabled = pfParsed.length === 0;
+        const preview = document.getElementById('pfPreview');
+        if (pfParsed.length) {
+            document.getElementById('pfCount').textContent = pfParsed.length + ' stocks parsed';
+            document.getElementById('pfTableBody').innerHTML = pfParsed.map(s => `
+                <tr>
+                    <td style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:0.8rem">${s.symbol}</td>
+                    <td style="color:var(--text-primary)">${s.name}</td>
+                    <td style="font-family:'JetBrains Mono',monospace">${s.qty}</td>
+                    <td style="font-family:'JetBrains Mono',monospace">₹${s.avgPrice.toLocaleString('en-IN')}</td>
+                </tr>`).join('');
+            preview.style.display = 'block';
+        }
+    }
+    async function doPFImport() {
+        if (!pfParsed.length) return;
+        const btn = document.getElementById('pfImportBtn');
+        btn.disabled = true; btn.textContent = 'Importing...';
+        const token = localStorage.getItem('onyx_token');
+        let imported = 0, skipped = 0;
+        for (const s of pfParsed) {
+            try {
+                const res = await fetch('/api/portfolio/stocks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ symbol: s.symbol, name: s.name, qty: s.qty, avgPrice: s.avgPrice })
+                });
+                if (res.ok) imported++; else skipped++;
+            } catch { skipped++; }
+        }
+        document.getElementById('pfImportedCount').textContent = imported;
+        document.getElementById('pfSkippedCount').textContent  = skipped;
+        const card = document.getElementById('pfResultCard');
+        card.className = 'result-card success';
+        card.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Import Portfolio';
     }
 </script>
 </body>
