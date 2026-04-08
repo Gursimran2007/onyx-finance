@@ -81,6 +81,9 @@ int main() {
     CROW_ROUTE(app, "/budget")([]() {
         return serveFile("frontend/budget.html", "text/html");
     });
+    CROW_ROUTE(app, "/portfolio_import.csv")([]() {
+        return serveFile("frontend/portfolio_import.csv", "text/csv");
+    });
 
     // ---- API routes ----
     setupTransactionRoutes(app, db);

@@ -567,15 +567,130 @@ select option { background: #0d0f12; }
 .step-text strong { color: var(--text-primary); font-weight: 600; }
 
 /* ── ANIMATIONS ─────────────────────────────────── */
-.fade-in { animation: fadeIn 0.4s ease forwards; }
+.fade-in { animation: fadeIn 0.45s cubic-bezier(0.22,1,0.36,1) forwards; }
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(16px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-.card { animation: fadeIn 0.4s ease forwards; }
-.card:nth-child(1) { animation-delay: 0.05s; }
+
+/* Staggered card entrance */
+.card { animation: cardIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+.card:nth-child(1) { animation-delay: 0.04s; }
 .card:nth-child(2) { animation-delay: 0.1s; }
-.card:nth-child(3) { animation-delay: 0.15s; }
+.card:nth-child(3) { animation-delay: 0.16s; }
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* Gold shimmer sweep on card hover */
+.card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(201,150,58,0.04), transparent);
+    transform: skewX(-15deg);
+    transition: none;
+}
+.card:hover::after {
+    animation: shimmer-sweep 0.6s ease forwards;
+}
+@keyframes shimmer-sweep {
+    from { left: -100%; }
+    to   { left: 150%; }
+}
+
+/* Page sections slide up on load */
+.charts-row, .table-wrap, .section-header, .form-card, .rep-card, .import-layout {
+    animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+    animation-delay: 0.12s;
+}
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pulsing gold border on focused inputs */
+input:focus, select:focus, textarea:focus {
+    animation: input-pulse 2s ease infinite;
+}
+@keyframes input-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--emerald-soft); }
+    50%       { box-shadow: 0 0 0 5px rgba(52,211,153,0.08); }
+}
+
+/* Table rows slide in */
+tbody tr {
+    animation: rowIn 0.3s ease both;
+}
+tbody tr:nth-child(1)  { animation-delay: 0.05s; }
+tbody tr:nth-child(2)  { animation-delay: 0.08s; }
+tbody tr:nth-child(3)  { animation-delay: 0.11s; }
+tbody tr:nth-child(4)  { animation-delay: 0.14s; }
+tbody tr:nth-child(5)  { animation-delay: 0.17s; }
+tbody tr:nth-child(6)  { animation-delay: 0.20s; }
+tbody tr:nth-child(7)  { animation-delay: 0.23s; }
+tbody tr:nth-child(8)  { animation-delay: 0.26s; }
+@keyframes rowIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Balance card ambient glow pulse */
+.card.balance::before {
+    background: radial-gradient(ellipse at 30% 50%, rgba(201,150,58,0.08), transparent 70%);
+    opacity: 1;
+    animation: glow-pulse 3s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+    0%, 100% { opacity: 0.6; }
+    50%       { opacity: 1.2; }
+}
+
+/* Income card ambient glow */
+.card.income::before {
+    background: radial-gradient(ellipse at 30% 50%, rgba(52,211,153,0.06), transparent 70%);
+    opacity: 1;
+    animation: glow-pulse 4s ease-in-out infinite;
+    animation-delay: 1s;
+}
+
+/* Button press feedback */
+.btn-primary:active { transform: scale(0.97); }
+.btn-send:active    { transform: scale(0.95); }
+
+/* Nav link hover underline animation */
+nav a::after {
+    content: '';
+    display: block;
+    height: 2px;
+    background: var(--gold);
+    transform: scaleX(0);
+    transition: transform 0.2s ease;
+    border-radius: 2px;
+    margin-top: -2px;
+}
+nav a:hover::after  { transform: scaleX(0.6); }
+nav a.active::after { transform: scaleX(1); background: var(--gold); }
+
+/* Chart card entrance */
+.chart-card {
+    animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+}
+.charts-row .chart-card:nth-child(1) { animation-delay: 0.18s; }
+.charts-row .chart-card:nth-child(2) { animation-delay: 0.26s; }
+
+/* Skeleton shimmer */
+.skeleton {
+    background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shine 1.5s infinite;
+    border-radius: 8px;
+}
+@keyframes skeleton-shine {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
 
 /* ── DIVIDER ─────────────────────────────────────── */
 .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(201,150,58,0.2), rgba(52,211,153,0.15), transparent); margin: 1.5rem 0; }

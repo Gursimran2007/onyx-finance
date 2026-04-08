@@ -36,6 +36,41 @@ static std::string httpGet(const std::string& url) {
     return response;
 }
 
+// Strip HTML tags and decode basic entities from a string
+static std::string stripHTML(const std::string& s) {
+    std::string out;
+    bool inTag = false;
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '<') { inTag = true; continue; }
+        if (s[i] == '>') { inTag = false; out += ' '; continue; }
+        if (!inTag) out += s[i];
+    }
+    // Decode common HTML entities
+    std::string decoded;
+    decoded.reserve(out.size());
+    for (size_t i = 0; i < out.size(); ++i) {
+        if (out[i] == '&') {
+            if (out.substr(i,4) == "&lt;")   { decoded += '<';  i+=3; }
+            else if (out.substr(i,4) == "&gt;")   { decoded += '>';  i+=3; }
+            else if (out.substr(i,5) == "&amp;")  { decoded += '&';  i+=4; }
+            else if (out.substr(i,6) == "&nbsp;") { decoded += ' ';  i+=5; }
+            else if (out.substr(i,6) == "&quot;") { decoded += '"';  i+=5; }
+            else decoded += out[i];
+        } else decoded += out[i];
+    }
+    // Collapse whitespace
+    std::string final;
+    bool prevSpace = true;
+    for (char c : decoded) {
+        if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+        if (c == ' ' && prevSpace) continue;
+        prevSpace = (c == ' ');
+        final += c;
+    }
+    while (!final.empty() && final.back() == ' ') final.pop_back();
+    return final;
+}
+
 // Parse RSS XML into JSON articles (minimal parser, no external lib)
 static json parseRSS(const std::string& xml, const std::string& source, const std::string& tag = "") {
     json arr = json::array();
@@ -73,8 +108,10 @@ static json parseRSS(const std::string& xml, const std::string& source, const st
             return v;
         };
 
-        title = exItem("<title>", "</title>");
-        desc  = exItem("<description>", "</description>");
+        title = stripHTML(exItem("<title>", "</title>"));
+        desc  = stripHTML(exItem("<description>", "</description>"));
+        // Truncate long descriptions
+        if (desc.size() > 200) desc = desc.substr(0, 197) + "...";
         link  = exItem("<link>", "</link>");
         date  = exItem("<pubDate>", "</pubDate>");
 

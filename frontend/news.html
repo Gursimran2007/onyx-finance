@@ -6,21 +6,31 @@
     <title>Onyx — News & Tax</title>
     <link rel="stylesheet" href="/style.css"/>
     <style>
-        .news-grid { display:grid; grid-template-columns:2fr 1fr; gap:1.5rem; }
-        .news-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.4rem; transition:border-color 0.2s,transform 0.2s; cursor:pointer; text-decoration:none; display:block; }
-        .news-card:hover { border-color:var(--border-mid); transform:translateY(-2px); }
-        .news-source { font-size:0.68rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem; }
-        .news-title { font-size:0.92rem; font-weight:600; color:var(--text-primary); line-height:1.45; margin-bottom:0.5rem; }
-        .news-desc { font-size:0.8rem; color:var(--text-secondary); line-height:1.5; }
-        .news-time { font-size:0.72rem; color:var(--text-muted); margin-top:0.6rem; font-family:'JetBrains Mono',monospace; }
-        .news-list { display:flex; flex-direction:column; gap:0.8rem; }
-        .tax-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1rem 1.2rem; display:flex; gap:1rem; align-items:flex-start; }
-        .tax-card.urgent { border-color:rgba(248,113,113,0.3); background:rgba(248,113,113,0.04); }
-        .tax-date { font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--text-muted); white-space:nowrap; padding-top:0.1rem; }
-        .tax-title { font-size:0.88rem; font-weight:600; color:var(--text-primary); }
-        .tax-desc { font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem; line-height:1.5; }
-        .urgent-badge { display:inline-block; padding:0.15rem 0.5rem; background:rgba(248,113,113,0.1); color:var(--expense); border:1px solid rgba(248,113,113,0.25); border-radius:4px; font-size:0.65rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin-left:0.5rem; }
-        .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:skeleton-shine 1.5s infinite; border-radius:8px; height:120px; }
+        .news-grid { display:grid; grid-template-columns:1fr 360px; gap:1.5rem; align-items:start; }
+        @media(max-width:900px){ .news-grid { grid-template-columns:1fr; } }
+        .news-col { min-width:0; }
+        .news-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.2rem 1.4rem; transition:border-color 0.2s,transform 0.2s; cursor:pointer; text-decoration:none; display:block; overflow:hidden; }
+        .news-card:hover { border-color:rgba(201,150,58,0.3); transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+        .news-source { font-size:0.68rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.5rem; }
+        .news-title { font-size:0.88rem; font-weight:600; color:var(--text-primary); line-height:1.45; margin-bottom:0.4rem; word-break:break-word; }
+        .news-desc { font-size:0.78rem; color:var(--text-secondary); line-height:1.5; word-break:break-word; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .news-time { font-size:0.7rem; color:var(--text-muted); margin-top:0.5rem; font-family:'JetBrains Mono',monospace; }
+        .news-list { display:flex; flex-direction:column; gap:0.7rem; }
+        /* Tax column — sticky so it stays in view while news scrolls */
+        .tax-col { position:sticky; top:80px; }
+        .tax-col-inner { background:var(--bg-card); border:1px solid rgba(52,211,153,0.12); border-radius:14px; overflow:hidden; }
+        .tax-col-header { padding:1rem 1.2rem 0.8rem; border-bottom:1px solid var(--border); }
+        .tax-col-header h3 { font-size:0.68rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--emerald); opacity:0.8; }
+        .tax-list { display:flex; flex-direction:column; }
+        .tax-card { padding:0.9rem 1.2rem; display:flex; gap:0.8rem; align-items:flex-start; border-bottom:1px solid var(--border); transition:background 0.15s; }
+        .tax-card:last-child { border-bottom:none; }
+        .tax-card:hover { background:var(--bg-hover); }
+        .tax-card.urgent { border-left:3px solid var(--expense); }
+        .tax-date { font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text-muted); white-space:nowrap; padding-top:0.15rem; min-width:68px; }
+        .tax-title { font-size:0.82rem; font-weight:600; color:var(--text-primary); line-height:1.4; }
+        .tax-desc { font-size:0.73rem; color:var(--text-muted); margin-top:0.2rem; line-height:1.4; }
+        .urgent-badge { display:inline-block; padding:0.12rem 0.45rem; background:rgba(248,113,113,0.1); color:var(--expense); border:1px solid rgba(248,113,113,0.25); border-radius:4px; font-size:0.62rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin-left:0.4rem; vertical-align:middle; }
+        .skeleton { background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-hover) 50%,var(--bg-card) 75%); background-size:200% 100%; animation:skeleton-shine 1.5s infinite; border-radius:8px; height:100px; }
         @keyframes skeleton-shine { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
     </style>
 </head>
@@ -45,19 +55,24 @@
         <p>Indian finance news and upcoming tax deadlines</p>
     </div>
     <div class="news-grid">
-        <div>
-            <div class="section-header"><h3>Finance News</h3></div>
+        <!-- Left: Finance News -->
+        <div class="news-col">
+            <div class="section-header" style="margin-bottom:0.8rem"><h3>Finance News</h3></div>
             <div class="news-list" id="newsList">
                 <div class="skeleton"></div>
                 <div class="skeleton"></div>
                 <div class="skeleton"></div>
             </div>
         </div>
-        <div>
-            <div class="section-header"><h3>Tax & Compliance Deadlines</h3></div>
-            <div class="news-list" id="taxList">
-                <div class="skeleton" style="height:80px"></div>
-                <div class="skeleton" style="height:80px"></div>
+        <!-- Right: Tax deadlines — fixed width, sticky -->
+        <div class="tax-col">
+            <div class="tax-col-inner">
+                <div class="tax-col-header"><h3>Tax &amp; Compliance Deadlines</h3></div>
+                <div class="tax-list" id="taxList">
+                    <div class="tax-card"><div class="tax-date">—</div><div><div class="tax-title" style="background:var(--bg-hover);border-radius:4px;height:14px;width:120px"></div><div class="tax-desc" style="background:var(--bg-hover);border-radius:4px;height:10px;width:180px;margin-top:6px"></div></div></div>
+                    <div class="tax-card"><div class="tax-date">—</div><div><div class="tax-title" style="background:var(--bg-hover);border-radius:4px;height:14px;width:100px"></div><div class="tax-desc" style="background:var(--bg-hover);border-radius:4px;height:10px;width:160px;margin-top:6px"></div></div></div>
+                    <div class="tax-card"><div class="tax-date">—</div><div><div class="tax-title" style="background:var(--bg-hover);border-radius:4px;height:14px;width:140px"></div></div></div>
+                </div>
             </div>
         </div>
     </div>
@@ -128,7 +143,7 @@
             document.getElementById('taxList').innerHTML = data.map(t => `
                 <div class="tax-card ${t.urgent ? 'urgent' : ''} fade-in">
                     <div class="tax-date">${t.date}</div>
-                    <div>
+                    <div style="min-width:0">
                         <div class="tax-title">${t.title}${t.urgent ? '<span class="urgent-badge">Due Soon</span>' : ''}</div>
                         <div class="tax-desc">${t.description}</div>
                     </div>
