@@ -7,63 +7,67 @@
     <link rel="stylesheet" href="/style.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .news-ticker-wrap {
+        /* ── News rotator ── */
+        .news-rotator {
             background: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(201,150,58,0.18);
             border-radius: 14px;
             overflow: hidden;
-            height: 200px;
+            margin-bottom: 1.5rem;
             position: relative;
         }
-        .news-ticker-wrap::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 60px;
-            background: linear-gradient(to bottom, transparent, var(--bg-card));
-            pointer-events: none;
-            z-index: 2;
-        }
-        .news-ticker {
+        .rotator-track {
             display: flex;
-            flex-direction: column;
-            gap: 0;
-            animation: ticker-scroll 30s linear infinite;
-            padding: 0.2rem 0;
+            transition: transform 0.5s cubic-bezier(0.4,0,0.2,1);
         }
-        .news-ticker:hover { animation-play-state: paused; }
-        @keyframes ticker-scroll {
-            0%   { transform: translateY(0); }
-            100% { transform: translateY(-50%); }
-        }
-        .ticker-item {
-            padding: 0.75rem 1.2rem;
-            border-bottom: 1px solid var(--border);
+        .rotator-slide {
+            min-width: 100%;
+            padding: 1.1rem 1.4rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            text-decoration: none;
             cursor: pointer;
             transition: background 0.15s;
-            text-decoration: none;
-            display: block;
+            border-left: 3px solid transparent;
         }
-        .ticker-item:hover { background: var(--bg-hover); }
-        .ticker-source {
-            font-size: 0.65rem;
-            font-weight: 600;
-            letter-spacing: 0.1em;
+        .rotator-slide:hover { background: var(--bg-hover); }
+        .rotator-slide.gold-accent  { border-left-color: var(--gold); }
+        .rotator-slide.green-accent { border-left-color: var(--emerald); }
+        .rotator-badge {
+            flex-shrink: 0;
+            padding: 0.2rem 0.55rem;
+            border-radius: 5px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: var(--gold);
-            margin-bottom: 0.2rem;
+            margin-top: 0.1rem;
         }
-        .ticker-title {
-            font-size: 0.82rem;
-            color: var(--text-primary);
-            line-height: 1.4;
-            font-weight: 500;
+        .rotator-badge.gold  { background: rgba(201,150,58,0.12); color: var(--gold); border: 1px solid rgba(201,150,58,0.25); }
+        .rotator-badge.green { background: rgba(52,211,153,0.1);  color: var(--emerald); border: 1px solid rgba(52,211,153,0.2); }
+        .rotator-body { flex: 1; min-width: 0; }
+        .rotator-source {
+            font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem;
         }
-        .ticker-loading {
-            padding: 1rem 1.2rem;
-            color: var(--text-muted);
-            font-size: 0.82rem;
+        .rotator-title {
+            font-size: 0.88rem; font-weight: 600;
+            color: var(--text-primary); line-height: 1.45;
         }
+        .rotator-dots {
+            display: flex; gap: 5px; justify-content: center;
+            padding: 0.55rem 0;
+            border-top: 1px solid var(--border);
+            background: var(--bg-base);
+        }
+        .rdot {
+            width: 5px; height: 5px; border-radius: 50%;
+            background: var(--border-mid); transition: all 0.3s;
+            cursor: pointer;
+        }
+        .rdot.active { background: var(--gold); width: 16px; border-radius: 3px; }
+        .ticker-loading { padding: 1rem 1.4rem; color: var(--text-muted); font-size: 0.82rem; }
     </style>
 </head>
 <body>
@@ -106,6 +110,18 @@
             <div class="sub">Net position</div>
         </div>
     </div>
+    <!-- News rotator -->
+    <div class="section-header" style="margin-bottom:0.7rem">
+        <h3>Market News</h3>
+        <a href="/news">View all →</a>
+    </div>
+    <div class="news-rotator" id="newsRotator">
+        <div class="rotator-track" id="rotatorTrack">
+            <div class="ticker-loading">Loading news...</div>
+        </div>
+        <div class="rotator-dots" id="rotatorDots"></div>
+    </div>
+
     <div class="charts-row">
         <div class="chart-card">
             <h3>Spending by Category</h3>
@@ -137,16 +153,6 @@
             </tbody>
         </table>
     </div>
-    <!-- News ticker -->
-    <div class="section-header" style="margin-top:1.5rem">
-        <h3>Market News</h3>
-        <a href="/news">View all →</a>
-    </div>
-    <div class="news-ticker-wrap">
-        <div class="news-ticker" id="newsTicker">
-            <div class="ticker-loading">Loading news...</div>
-        </div>
-    </div>
 </main>
 <script src="/app.js"></script>
 <script>
@@ -156,30 +162,42 @@
         new Date().toLocaleDateString('en-IN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     loadDashboard();
 
-    async function loadNewsTicker() {
+    async function loadNewsRotator() {
         try {
             const res = await fetch('/api/news?_=' + Date.now(), {
-                headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('onyx_token'),
-                    'Cache-Control': 'no-cache'
-                }
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token'), 'Cache-Control': 'no-cache' }
             });
             const news = await res.json();
             if (!Array.isArray(news) || !news.length) return;
 
-            // Take up to 10 items, duplicate for seamless loop
-            const items = news.slice(0, 10);
-            const doubled = [...items, ...items];
+            const items = news.slice(0, 8);
+            const track = document.getElementById('rotatorTrack');
+            const dots  = document.getElementById('rotatorDots');
 
-            const ticker = document.getElementById('newsTicker');
-            ticker.innerHTML = doubled.map(n => `
-                <a class="ticker-item" href="${n.url || '#'}" target="_blank" rel="noopener">
-                    <div class="ticker-source">${n.source || 'News'}</div>
-                    <div class="ticker-title">${n.title || ''}</div>
+            track.innerHTML = items.map((n, i) => `
+                <a class="rotator-slide ${i%2===0 ? 'gold-accent' : 'green-accent'}" href="${n.url||'#'}" target="_blank" rel="noopener">
+                    <span class="rotator-badge ${i%2===0 ? 'gold' : 'green'}">${n.tag || (n.source||'News').split(' ')[0]}</span>
+                    <div class="rotator-body">
+                        <div class="rotator-source">${n.source || 'Finance'}</div>
+                        <div class="rotator-title">${n.title || ''}</div>
+                    </div>
                 </a>`).join('');
+
+            dots.innerHTML = items.map((_,i) => `<div class="rdot${i===0?' active':''}" onclick="goSlide(${i})"></div>`).join('');
+
+            let cur = 0, autoTimer;
+            window.goSlide = function(idx) {
+                cur = idx;
+                track.style.transform = `translateX(-${idx * 100}%)`;
+                document.querySelectorAll('.rdot').forEach((d,i) => d.classList.toggle('active', i===idx));
+            };
+            function startAuto() { autoTimer = setInterval(() => goSlide((cur + 1) % items.length), 4000); }
+            startAuto();
+            document.getElementById('newsRotator').addEventListener('mouseenter', () => clearInterval(autoTimer));
+            document.getElementById('newsRotator').addEventListener('mouseleave', startAuto);
         } catch {}
     }
-    loadNewsTicker();
+    loadNewsRotator();
 </script>
 </body>
 </html>
