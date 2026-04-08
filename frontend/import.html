@@ -3,8 +3,32 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Onyx — Import Bank Statement</title>
+    <title>Onyx — Import</title>
     <link rel="stylesheet" href="/style.css"/>
+    <style>
+        .tab-row { display:flex; gap:0; margin-bottom:1.5rem; border-bottom:1px solid var(--border); }
+        .tab-btn { background:none; border:none; color:var(--text-muted); font-size:0.85rem; font-weight:600; padding:0.7rem 1.4rem; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color 0.2s,border-color 0.2s; letter-spacing:0.04em; }
+        .tab-btn.active { color:var(--text-primary); border-bottom-color:var(--text-primary); }
+        .tab-pane { display:none; }
+        .tab-pane.active { display:block; }
+
+        /* SMS pane */
+        .sms-textarea { width:100%; min-height:180px; background:var(--bg-base); border:1px solid var(--border); border-radius:10px; color:var(--text-primary); font-size:0.82rem; font-family:'JetBrains Mono',monospace; padding:1rem; resize:vertical; line-height:1.6; box-sizing:border-box; }
+        .sms-textarea:focus { outline:none; border-color:var(--border-mid); }
+        .sms-hint { font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem; line-height:1.6; }
+        .sms-preview { margin-top:1.2rem; }
+        .sms-preview table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        .sms-preview th { font-size:0.7rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted); text-align:left; padding:0.5rem 0.6rem; border-bottom:1px solid var(--border); }
+        .sms-preview td { padding:0.5rem 0.6rem; border-bottom:1px solid rgba(255,255,255,0.03); color:var(--text-secondary); }
+        .sms-preview td:last-child { font-family:'JetBrains Mono',monospace; }
+        .badge-inc { color:var(--income); } .badge-exp { color:var(--expense); }
+        .parsed-count { font-size:0.78rem; color:var(--text-muted); margin-bottom:0.6rem; }
+        .btn-sms-import { margin-top:1rem; }
+
+        /* Samples accordion */
+        .samples-toggle { font-size:0.75rem; color:var(--text-muted); cursor:pointer; text-decoration:underline; margin-top:0.5rem; display:inline-block; }
+        .samples-box { display:none; background:var(--bg-base); border:1px solid var(--border); border-radius:8px; padding:0.8rem 1rem; margin-top:0.5rem; font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text-muted); line-height:2; white-space:pre-wrap; }
+    </style>
 </head>
 <body>
 <nav>
@@ -15,61 +39,134 @@
     <a href="/portfolio">Portfolio</a>
     <a href="/news">News</a>
     <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget">Budget</a>
     <a href="/chat">AI Chat</a>
     <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
 </nav>
 <main>
     <div class="page-header">
-        <h1>Import Bank Statement</h1>
-        <p>Upload a CSV from your bank — transactions are auto-categorized</p>
+        <h1>Import Transactions</h1>
+        <p>Upload a bank CSV or paste UPI SMS messages</p>
     </div>
-    <div class="import-layout">
-        <div class="form-card">
-            <div class="form-section-title">Select Bank</div>
-            <div class="bank-grid">
-                <div class="bank-btn selected" data-bank="hdfc"    onclick="selectBank(this)">HDFC</div>
-                <div class="bank-btn" data-bank="sbi"     onclick="selectBank(this)">SBI</div>
-                <div class="bank-btn" data-bank="icici"   onclick="selectBank(this)">ICICI</div>
-                <div class="bank-btn" data-bank="axis"    onclick="selectBank(this)">Axis</div>
-                <div class="bank-btn" data-bank="kotak"   onclick="selectBank(this)">Kotak</div>
-                <div class="bank-btn" data-bank="yes"     onclick="selectBank(this)">Yes Bank</div>
-                <div class="bank-btn" data-bank="pnb"     onclick="selectBank(this)">PNB</div>
-                <div class="bank-btn" data-bank="generic" onclick="selectBank(this)">Other</div>
+
+    <div class="tab-row">
+        <button class="tab-btn active" onclick="switchTab('csv',this)">Bank CSV</button>
+        <button class="tab-btn"        onclick="switchTab('sms',this)">UPI SMS</button>
+    </div>
+
+    <!-- ============ CSV TAB ============ -->
+    <div class="tab-pane active" id="tab-csv">
+        <div class="import-layout">
+            <div class="form-card">
+                <div class="form-section-title">Select Bank</div>
+                <div class="bank-grid">
+                    <div class="bank-btn selected" data-bank="hdfc"    onclick="selectBank(this)">HDFC</div>
+                    <div class="bank-btn" data-bank="sbi"     onclick="selectBank(this)">SBI</div>
+                    <div class="bank-btn" data-bank="icici"   onclick="selectBank(this)">ICICI</div>
+                    <div class="bank-btn" data-bank="axis"    onclick="selectBank(this)">Axis</div>
+                    <div class="bank-btn" data-bank="kotak"   onclick="selectBank(this)">Kotak</div>
+                    <div class="bank-btn" data-bank="yes"     onclick="selectBank(this)">Yes Bank</div>
+                    <div class="bank-btn" data-bank="pnb"     onclick="selectBank(this)">PNB</div>
+                    <div class="bank-btn" data-bank="generic" onclick="selectBank(this)">Other</div>
+                </div>
+                <div class="divider"></div>
+                <div class="form-section-title">Upload CSV</div>
+                <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="dz-icon">↑</div>
+                    <p>Click to upload or drag & drop</p>
+                    <p style="margin-top:0.3rem;font-size:0.75rem">CSV files only · All Indian banks supported</p>
+                    <div class="filename" id="fileName"></div>
+                </div>
+                <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleFile(this)"/>
+                <button class="btn-primary" id="importBtn" onclick="doImport()" disabled>Import Transactions</button>
+                <div class="result-card" id="resultCard">
+                    <div class="result-stat"><span class="label">Imported</span><span class="val imported" id="importedCount">0</span></div>
+                    <div class="result-stat"><span class="label">Skipped</span><span class="val skipped" id="skippedCount">0</span></div>
+                    <a class="result-link" href="/">View on Dashboard →</a>
+                </div>
             </div>
-            <div class="divider"></div>
-            <div class="form-section-title">Upload CSV</div>
-            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                <div class="dz-icon">↑</div>
-                <p>Click to upload or drag & drop</p>
-                <p style="margin-top:0.3rem;font-size:0.75rem">CSV files only · All Indian banks supported</p>
-                <div class="filename" id="fileName"></div>
-            </div>
-            <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleFile(this)"/>
-            <button class="btn-primary" id="importBtn" onclick="doImport()" disabled>Import Transactions</button>
-            <div class="result-card" id="resultCard">
-                <div class="result-stat"><span class="label">Imported</span><span class="val imported" id="importedCount">0</span></div>
-                <div class="result-stat"><span class="label">Skipped</span><span class="val skipped" id="skippedCount">0</span></div>
-                <a class="result-link" href="/">View on Dashboard →</a>
+            <div class="form-card">
+                <div class="form-section-title" id="bankTitle">How to export from HDFC</div>
+                <div class="steps-list" id="bankSteps"></div>
+                <div class="divider"></div>
+                <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
+                    <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
+                        Transactions are auto-tagged by merchant name —
+                        Swiggy → Food, Uber → Transport, Amazon → Shopping, and so on.
+                    </p>
+                </div>
             </div>
         </div>
-        <div class="form-card">
-            <div class="form-section-title" id="bankTitle">How to export from HDFC</div>
-            <div class="steps-list" id="bankSteps"></div>
-            <div class="divider"></div>
-            <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
-                <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
-                    Transactions are auto-tagged by merchant name —
-                    Swiggy → Food, Uber → Transport, Amazon → Shopping, and so on.
+    </div>
+
+    <!-- ============ SMS TAB ============ -->
+    <div class="tab-pane" id="tab-sms">
+        <div class="import-layout">
+            <div class="form-card">
+                <div class="form-section-title">Paste UPI / Bank SMS Messages</div>
+                <textarea class="sms-textarea" id="smsInput" placeholder="Paste one or more SMS messages here, each on a new line…" oninput="parseSMS()"></textarea>
+                <p class="sms-hint">
+                    Supports: PhonePe, Google Pay, Paytm, BHIM, HDFC, ICICI, SBI, Axis UPI alerts<br>
+                    Tip: Long-press an SMS in your messages app → Copy text → Paste here
                 </p>
+                <span class="samples-toggle" onclick="toggleSamples()">Show sample SMS formats</span>
+                <div class="samples-box" id="samplesBox">Rs.380.00 debited from A/c XX1234 to VPA swiggy@icici on 02-03-26. Avl bal Rs.94620.00
+INR 25,000.00 credited to your a/c XX5678 by IMPS from VPA client@upi Ref 123456789 on 06-03-26
+Dear Customer, INR 22,000 has been debited from your account ending 1234 for RENT MARCH 2026 on 03/03/2026
+Rs 1240 Debited from SBI A/c XXXX6789 on 07-03-26. Info: APOLLO PHARMACY. Avl Bal: Rs 92092</div>
+
+                <div class="sms-preview" id="smsPreview" style="display:none">
+                    <div class="parsed-count" id="parsedCount"></div>
+                    <table>
+                        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th></tr></thead>
+                        <tbody id="smsTableBody"></tbody>
+                    </table>
+                </div>
+
+                <button class="btn-primary btn-sms-import" id="smsBulkBtn" onclick="doSMSImport()" style="display:none">
+                    Import All Parsed Transactions
+                </button>
+                <div class="result-card" id="smsResultCard">
+                    <div class="result-stat"><span class="label">Imported</span><span class="val imported" id="smsImportedCount">0</span></div>
+                    <a class="result-link" href="/">View on Dashboard →</a>
+                </div>
+            </div>
+            <div class="form-card">
+                <div class="form-section-title">How to get UPI SMS</div>
+                <div class="steps-list">
+                    <div class="step-item"><div class="step-num">1</div><div class="step-text">Open <strong>Messages app</strong> on your phone</div></div>
+                    <div class="step-item"><div class="step-num">2</div><div class="step-text">Search for <strong>"debited"</strong> or <strong>"UPI"</strong> or your bank name</div></div>
+                    <div class="step-item"><div class="step-num">3</div><div class="step-text">Select multiple SMS messages and <strong>copy</strong></div></div>
+                    <div class="step-item"><div class="step-num">4</div><div class="step-text">Paste them all at once in the <strong>box on the left</strong></div></div>
+                    <div class="step-item"><div class="step-num">5</div><div class="step-text">Review the parsed transactions, then <strong>Import</strong></div></div>
+                </div>
+                <div class="divider"></div>
+                <div style="padding:1rem;background:var(--bg-base);border:1px solid var(--border);border-radius:10px">
+                    <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
+                        Onyx parses UPI debit/credit alerts from all major banks and payment apps entirely on-device. Your SMS messages are never sent to any server — only the extracted transaction data is saved.
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 </main>
+
 <script src="/app.js"></script>
 <script>
     requireAuth();
     document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
 
+    // ── Tab switching ──────────────────────────────────────────────
+    function switchTab(id, btn) {
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + id).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // ── CSV tab ────────────────────────────────────────────────────
     let selectedBank = 'hdfc', csvContent = null;
     const instructions = {
         hdfc:    [['Log in to','netbanking.hdfcbank.com'],['Go to','Accounts → Account Statement'],['Select date range, click','Download'],['Format:','CSV / Excel (CSV)'],['Upload the file','here']],
@@ -114,7 +211,11 @@
         const btn = document.getElementById('importBtn');
         btn.disabled = true; btn.textContent = 'Importing...';
         try {
-            const res  = await fetch('/api/import/csv', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({csv:csvContent, bank:selectedBank}) });
+            const res  = await fetch('/api/import/csv', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') },
+                body: JSON.stringify({ csv: csvContent, bank: selectedBank })
+            });
             const data = await res.json();
             const card = document.getElementById('resultCard');
             if (data.error) { card.innerHTML = `<p style="color:var(--expense);font-size:0.85rem">Error: ${data.error}</p>`; }
@@ -125,6 +226,184 @@
         btn.disabled = false; btn.textContent = 'Import Transactions';
     }
     renderSteps();
+
+    // ── UPI SMS parser ─────────────────────────────────────────────
+    let parsedTxns = [];
+
+    function guessCategory(desc) {
+        const d = desc.toLowerCase();
+        if (/salary|payroll/.test(d))                                       return 'Salary';
+        if (/swiggy|zomato|food|cafe|restaurant|dominos|pizza|biryani/.test(d)) return 'Food';
+        if (/uber|ola|metro|petrol|fuel|hpcl|bpcl|iocl/.test(d))           return 'Transport';
+        if (/rent|housing/.test(d))                                         return 'Rent';
+        if (/netflix|spotify|prime|hotstar|disney|youtube/.test(d))         return 'Entertainment';
+        if (/hospital|pharmacy|medical|apollo|doctor|clinic/.test(d))       return 'Health';
+        if (/amazon|flipkart|myntra|shopping|meesho/.test(d))               return 'Shopping';
+        if (/electricity|broadband|recharge|bill|jio|airtel|vi|bsnl/.test(d)) return 'Utilities';
+        if (/gym|cult|fitness/.test(d))                                     return 'Fitness';
+        if (/mutual fund|sip|nifty|sensex|zerodha|upstox|groww/.test(d))   return 'Investment';
+        return 'Other';
+    }
+
+    // Today's date as fallback
+    function todayStr() {
+        return new Date().toISOString().slice(0,10);
+    }
+
+    // Parse DD-MM-YY or DD/MM/YYYY or DD-MM-YYYY → YYYY-MM-DD
+    function parseDate(s) {
+        if (!s) return todayStr();
+        s = s.trim();
+        // DD-MM-YY
+        const m1 = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);
+        if (m1) return `20${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+        // DD-MM-YYYY
+        const m2 = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+        if (m2) return `${m2[3]}-${m2[2].padStart(2,'0')}-${m2[1].padStart(2,'0')}`;
+        // YYYY-MM-DD already
+        const m3 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m3) return s;
+        return todayStr();
+    }
+
+    // Clean amount string: "1,240.00" → 1240
+    function parseAmt(s) {
+        if (!s) return 0;
+        return parseFloat(s.replace(/,/g, '')) || 0;
+    }
+
+    // Extract merchant/info from SMS
+    function extractMerchant(sms) {
+        // VPA pattern: "to VPA merchant@bank" or "from VPA sender@bank"
+        let m = sms.match(/to\s+(?:VPA\s+)?([a-zA-Z0-9._@]+)/i);
+        if (m && !m[1].match(/^\d+$/)) return m[1].replace(/@\w+$/, '').replace(/[_]/g, ' ').trim();
+        // Info: MERCHANT NAME
+        m = sms.match(/(?:info|for|ref|trf to)[:\s]+([A-Z][A-Z0-9 ]{2,30})/i);
+        if (m) return m[1].trim();
+        return '';
+    }
+
+    function parseSMSLine(line) {
+        line = line.trim();
+        if (line.length < 20) return null;
+
+        // Amount patterns
+        const amtPatterns = [
+            /(?:Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)/i,
+            /(?:Rs\.?|INR)\s*([\d,]+)/i,
+        ];
+        let amtStr = '';
+        for (const p of amtPatterns) {
+            const m = line.match(p);
+            if (m) { amtStr = m[1]; break; }
+        }
+        const amount = parseAmt(amtStr);
+        if (!amount || amount < 1) return null;
+
+        // Date patterns
+        const datePatterns = [
+            /on\s+(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i,
+            /(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/,
+        ];
+        let dateStr = '';
+        for (const p of datePatterns) {
+            const m = line.match(p);
+            if (m) { dateStr = m[1]; break; }
+        }
+        const date = parseDate(dateStr);
+
+        // Type detection
+        const debitWords  = /debit|debited|paid|sent|transfer(red)? to|withdrawn|purchase/i;
+        const creditWords = /credit|credited|received|deposited|refund|cashback/i;
+        let type = 'expense';
+        if (creditWords.test(line) && !debitWords.test(line)) type = 'income';
+        if (debitWords.test(line)) type = 'expense';
+
+        // Merchant
+        const merchant = extractMerchant(line);
+        const description = merchant || (type === 'income' ? 'UPI Credit' : 'UPI Payment');
+        const category = guessCategory(description + ' ' + line);
+
+        return { date, description, category, amount, type };
+    }
+
+    function parseSMS() {
+        const raw = document.getElementById('smsInput').value;
+        const lines = raw.split('\n').filter(l => l.trim().length > 0);
+
+        // Try to parse each line individually first; if a line looks like a continuation, join with previous
+        parsedTxns = [];
+        let buffer = '';
+        for (const line of lines) {
+            // A new SMS usually starts with "Dear", "Rs", "INR", bank name, or a date pattern
+            const startsNew = /^(dear|rs\.?|inr|your|a\/c|account|\d{2}[-\/]\d{2})/i.test(line.trim());
+            if (startsNew && buffer) {
+                const t = parseSMSLine(buffer);
+                if (t) parsedTxns.push(t);
+                buffer = line;
+            } else {
+                buffer = buffer ? buffer + ' ' + line : line;
+            }
+        }
+        if (buffer) {
+            const t = parseSMSLine(buffer);
+            if (t) parsedTxns.push(t);
+        }
+
+        const preview = document.getElementById('smsPreview');
+        const tbody   = document.getElementById('smsTableBody');
+        const bulkBtn = document.getElementById('smsBulkBtn');
+
+        if (!parsedTxns.length) {
+            preview.style.display = 'none';
+            bulkBtn.style.display = 'none';
+            return;
+        }
+
+        document.getElementById('parsedCount').textContent = `${parsedTxns.length} transaction${parsedTxns.length > 1 ? 's' : ''} parsed`;
+        tbody.innerHTML = parsedTxns.map((t,i) => `
+            <tr>
+                <td>${t.date}</td>
+                <td style="color:var(--text-primary)">${t.description}</td>
+                <td><span style="padding:0.1rem 0.4rem;background:var(--bg-base);border:1px solid var(--border);border-radius:4px;font-size:0.68rem;color:var(--text-muted)">${t.category}</span></td>
+                <td class="${t.type === 'income' ? 'badge-inc' : 'badge-exp'}">${t.type}</td>
+                <td class="${t.type === 'income' ? 'badge-inc' : 'badge-exp'}" style="font-family:'JetBrains Mono',monospace">
+                    ${t.type === 'income' ? '+' : '-'}₹${t.amount.toLocaleString('en-IN')}
+                </td>
+            </tr>`).join('');
+        preview.style.display  = 'block';
+        bulkBtn.style.display  = 'block';
+    }
+
+    async function doSMSImport() {
+        if (!parsedTxns.length) return;
+        const btn = document.getElementById('smsBulkBtn');
+        btn.disabled = true; btn.textContent = 'Importing...';
+
+        let imported = 0;
+        const token = localStorage.getItem('onyx_token');
+        for (const t of parsedTxns) {
+            try {
+                const res = await fetch('/api/transactions', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body:    JSON.stringify(t)
+                });
+                if (res.ok) imported++;
+            } catch {}
+        }
+
+        const card = document.getElementById('smsResultCard');
+        document.getElementById('smsImportedCount').textContent = imported;
+        card.className = 'result-card success';
+        card.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Import All Parsed Transactions';
+    }
+
+    function toggleSamples() {
+        const box = document.getElementById('samplesBox');
+        box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    }
 </script>
 </body>
 </html>

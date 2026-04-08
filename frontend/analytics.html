@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — Analytics</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ── Summary row ─────────────────────────────── */
+        .analytics-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+        }
+        .an-stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem 1.4rem;
+        }
+        .an-stat .label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.45rem;
+        }
+        .an-stat .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .an-stat.income-stat .val  { color: var(--income); }
+        .an-stat.expense-stat .val { color: var(--expense); }
+        .an-stat.savings-stat .val { color: var(--gold); }
+
+        /* ── Chart cards ─────────────────────────────── */
+        .an-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .an-card h3 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+        }
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+        }
+        .chart-wrap canvas {
+            width: 100% !important;
+        }
+
+        /* ── Two-col layout ──────────────────────────── */
+        .an-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .an-row .an-card {
+            margin-bottom: 0;
+        }
+
+        /* ── Skeleton loaders ────────────────────────── */
+        .skeleton {
+            background: linear-gradient(
+                90deg,
+                var(--bg-hover) 25%,
+                var(--border) 50%,
+                var(--bg-hover) 75%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 1.6s infinite;
+            border-radius: 8px;
+            height: 200px;
+        }
+        @keyframes shimmer {
+            0%   { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ── Top merchants ───────────────────────────── */
+        .merchant-row {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            margin-bottom: 0.65rem;
+        }
+        .merchant-rank {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            min-width: 1.4rem;
+            text-align: right;
+        }
+        .merchant-name {
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            min-width: 120px;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .merchant-bar-wrap {
+            flex: 1;
+            background: var(--bg-base);
+            border-radius: 4px;
+            height: 7px;
+            overflow: hidden;
+        }
+        .merchant-bar {
+            height: 100%;
+            border-radius: 4px;
+            background: rgba(248, 113, 113, 0.55);
+            transition: width 0.6s ease;
+        }
+        .merchant-amt {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--expense);
+            min-width: 72px;
+            text-align: right;
+        }
+
+        /* ── Category heatmap grid ───────────────────── */
+        .cat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.85rem;
+        }
+        .cat-heat-card {
+            background: var(--bg-base);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+        .cat-heat-name {
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 0.35rem;
+        }
+        .cat-heat-amt {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--expense);
+            margin-bottom: 0.2rem;
+        }
+        .cat-heat-pct {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }
+        .cat-heat-bar-wrap {
+            background: var(--border);
+            border-radius: 3px;
+            height: 4px;
+            overflow: hidden;
+        }
+        .cat-heat-bar {
+            height: 100%;
+            border-radius: 3px;
+            background: rgba(248, 113, 113, 0.6);
+            transition: width 0.6s ease;
+        }
+
+        /* ── Best / Worst month cards ────────────────── */
+        .best-worst-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .bw-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 1.5rem;
+        }
+        .bw-card h3 {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .bw-month-label {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+        .bw-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .bw-stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+        .bw-stat-row .bw-lbl { color: var(--text-muted); }
+        .bw-stat-row .bw-val { font-family: 'JetBrains Mono', monospace; }
+        .bw-card.best  { border-color: rgba(52, 211, 153, 0.2); }
+        .bw-card.worst { border-color: rgba(248, 113, 113, 0.2); }
+        .bw-card.best  h3 { color: var(--emerald); }
+        .bw-card.worst h3 { color: var(--expense); }
+        .bw-badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.55rem;
+            border-radius: 20px;
+            margin-bottom: 0.6rem;
+        }
+        .bw-badge.best  { background: rgba(52,211,153,0.12); color: var(--emerald); }
+        .bw-badge.worst { background: rgba(248,113,113,0.12); color: var(--expense); }
+
+        /* ── Empty state ─────────────────────────────── */
+        .empty-analytics {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+        .empty-analytics .empty-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            opacity: 0.35;
+        }
+        .empty-analytics p {
+            font-size: 0.88rem;
+            line-height: 1.7;
+        }
+        .empty-analytics a {
+            color: var(--gold);
+            text-decoration: none;
+        }
+        .empty-analytics a:hover {
+            text-decoration: underline;
+        }
+
+        /* ── Responsive ──────────────────────────────── */
+        @media (max-width: 900px) {
+            .analytics-summary { grid-template-columns: repeat(2, 1fr); }
+            .an-row, .best-worst-row { grid-template-columns: 1fr; }
+            .cat-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 560px) {
+            .analytics-summary { grid-template-columns: 1fr 1fr; }
+            .cat-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/portfolio">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics" class="active">Analytics</a>
+    <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
+</nav>
+
+<main>
+    <div class="page-header">
+        <h1>Analytics</h1>
+        <p>Deep dive into your spending patterns</p>
+    </div>
+
+    <!-- Summary row -->
+    <div class="analytics-summary" id="summaryRow">
+        <div class="an-stat"><div class="label">Months Tracked</div><div class="val skeleton" style="height:1.6rem;width:60%;border-radius:4px"></div></div>
+        <div class="an-stat income-stat"><div class="label">Avg Monthly Income</div><div class="val skeleton" style="height:1.6rem;width:80%;border-radius:4px"></div></div>
+        <div class="an-stat expense-stat"><div class="label">Avg Monthly Expenses</div><div class="val skeleton" style="height:1.6rem;width:80%;border-radius:4px"></div></div>
+        <div class="an-stat savings-stat"><div class="label">Avg Savings Rate</div><div class="val skeleton" style="height:1.6rem;width:60%;border-radius:4px"></div></div>
+    </div>
+
+    <!-- Income vs Expenses chart -->
+    <div class="an-card">
+        <h3>Monthly Income vs Expenses — Last 12 Months</h3>
+        <div id="incExpWrap" class="chart-wrap">
+            <div class="skeleton"></div>
+        </div>
+    </div>
+
+    <!-- Savings Rate chart -->
+    <div class="an-card">
+        <h3>Savings Rate Trend — Last 12 Months</h3>
+        <div id="savingsWrap" class="chart-wrap">
+            <div class="skeleton"></div>
+        </div>
+    </div>
+
+    <!-- Top Merchants + Category heatmap -->
+    <div class="an-row">
+        <div class="an-card">
+            <h3>Top 8 Merchants / Payees</h3>
+            <div id="merchantList"><div class="skeleton"></div></div>
+        </div>
+        <div class="an-card">
+            <h3>Spending by Category</h3>
+            <div id="catHeatmap"><div class="skeleton"></div></div>
+        </div>
+    </div>
+
+    <!-- Best & Worst month -->
+    <div class="best-worst-row" id="bestWorstRow">
+        <div class="bw-card best skeleton" style="min-height:160px"></div>
+        <div class="bw-card worst skeleton" style="min-height:160px"></div>
+    </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+requireAuth();
+document.getElementById('userLabel').textContent =
+    (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
+
+/* ── Formatting ──────────────────────────────────── */
+const fmtRupee = v =>
+    '₹' + Math.abs(v).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+/* ── Common Chart.js defaults ────────────────────── */
+const GRID_COLOR  = 'rgba(255,255,255,0.04)';
+const TICK_COLOR  = '#3d4450';
+const TOOLTIP_CFG = {
+    backgroundColor: '#0d0f12',
+    borderColor: '#1a1d22',
+    borderWidth: 1,
+    titleColor: '#f1f5f9',
+    bodyColor: '#8892a4',
+    padding: 10
+};
+
+/* ── Build last-12-months label array ─────────────── */
+function last12Months() {
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        const label = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        months.push({ key, label });
+    }
+    return months;
+}
+
+/* ── Parse merchant name from description ─────────── */
+function parseMerchant(desc) {
+    if (!desc) return 'Unknown';
+    return (desc.split(' ')[0] || desc).trim();
+}
+
+/* ── Main render ─────────────────────────────────── */
+let incExpChart   = null;
+let savingsChart  = null;
+
+async function loadAnalytics() {
+    let txns;
+    try {
+        const res = await fetch('/api/transactions', {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('onyx_token') }
+        });
+        txns = await res.json();
+        if (!Array.isArray(txns)) txns = [];
+    } catch {
+        txns = [];
+    }
+
+    /* ── Empty state ─────────────────────────────── */
+    if (txns.length === 0) {
+        const emptyHTML = `
+            <div class="empty-analytics">
+                <div class="empty-icon">◈</div>
+                <p>No data yet — import some transactions first.<br>
+                   <a href="/import">Go to Import →</a></p>
+            </div>`;
+        document.getElementById('summaryRow').innerHTML   = emptyHTML;
+        document.getElementById('incExpWrap').innerHTML   = emptyHTML;
+        document.getElementById('savingsWrap').innerHTML  = emptyHTML;
+        document.getElementById('merchantList').innerHTML = emptyHTML;
+        document.getElementById('catHeatmap').innerHTML   = emptyHTML;
+        document.getElementById('bestWorstRow').innerHTML = emptyHTML;
+        return;
+    }
+
+    /* ── Group by YYYY-MM ────────────────────────── */
+    const byMonth = {};
+    txns.forEach(t => {
+        const m = t.date ? t.date.slice(0, 7) : null;
+        if (!m) return;
+        if (!byMonth[m]) byMonth[m] = { inc: 0, exp: 0 };
+        if (t.type === 'income')  byMonth[m].inc += t.amount;
+        else if (t.type === 'expense') byMonth[m].exp += t.amount;
+    });
+
+    const months12 = last12Months();
+    const monthKeys  = months12.map(m => m.key);
+    const monthLabels = months12.map(m => m.label);
+
+    const incData = monthKeys.map(k => byMonth[k] ? byMonth[k].inc : 0);
+    const expData = monthKeys.map(k => byMonth[k] ? byMonth[k].exp : 0);
+
+    /* ── Summary stats ───────────────────────────── */
+    const allMonthKeys = Object.keys(byMonth);
+    const totalMonths  = allMonthKeys.length;
+
+    const allInc = allMonthKeys.map(k => byMonth[k].inc);
+    const allExp = allMonthKeys.map(k => byMonth[k].exp);
+    const avgInc = totalMonths ? allInc.reduce((s, v) => s + v, 0) / totalMonths : 0;
+    const avgExp = totalMonths ? allExp.reduce((s, v) => s + v, 0) / totalMonths : 0;
+
+    const savingsRates12 = monthKeys.map(k => {
+        if (!byMonth[k] || byMonth[k].inc === 0) return 0;
+        const rate = (byMonth[k].inc - byMonth[k].exp) / byMonth[k].inc * 100;
+        return Math.min(100, Math.max(-100, rate));
+    });
+    const nonZeroRates = savingsRates12.filter((_, i) => byMonth[monthKeys[i]]);
+    const avgSavingsRate = nonZeroRates.length
+        ? nonZeroRates.reduce((s, v) => s + v, 0) / nonZeroRates.length
+        : 0;
+
+    /* Render summary */
+    document.getElementById('summaryRow').innerHTML = `
+        <div class="an-stat">
+            <div class="label">Months Tracked</div>
+            <div class="val">${totalMonths}</div>
+        </div>
+        <div class="an-stat income-stat">
+            <div class="label">Avg Monthly Income</div>
+            <div class="val">${fmtRupee(avgInc)}</div>
+        </div>
+        <div class="an-stat expense-stat">
+            <div class="label">Avg Monthly Expenses</div>
+            <div class="val">${fmtRupee(avgExp)}</div>
+        </div>
+        <div class="an-stat savings-stat">
+            <div class="label">Avg Savings Rate</div>
+            <div class="val">${avgSavingsRate.toFixed(1)}%</div>
+        </div>`;
+
+    /* ── Income vs Expenses chart ────────────────── */
+    document.getElementById('incExpWrap').innerHTML =
+        '<canvas id="incExpChart" height="90"></canvas>';
+
+    if (incExpChart) { incExpChart.destroy(); incExpChart = null; }
+    incExpChart = new Chart(document.getElementById('incExpChart'), {
+        type: 'bar',
+        data: {
+            labels: monthLabels,
+            datasets: [
+                {
+                    label: 'Income',
+                    data: incData,
+                    backgroundColor: 'rgba(52,211,153,0.7)',
+                    borderRadius: 4,
+                    borderSkipped: false
+                },
+                {
+                    label: 'Expenses',
+                    data: expData,
+                    backgroundColor: 'rgba(248,113,113,0.7)',
+                    borderRadius: 4,
+                    borderSkipped: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: TICK_COLOR, font: { family: 'Inter', size: 11 }, boxWidth: 12 }
+                },
+                tooltip: {
+                    ...TOOLTIP_CFG,
+                    callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtRupee(ctx.raw)}` }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: GRID_COLOR },
+                    ticks: { color: TICK_COLOR, font: { family: 'Inter', size: 10 } }
+                },
+                y: {
+                    grid: { color: GRID_COLOR },
+                    ticks: {
+                        color: TICK_COLOR,
+                        font: { family: 'Inter', size: 10 },
+                        callback: v => '₹' + v.toLocaleString('en-IN')
+                    }
+                }
+            },
+            animation: { duration: 700 },
+            backgroundColor: 'transparent'
+        }
+    });
+
+    /* ── Savings Rate line chart ──────────────────── */
+    document.getElementById('savingsWrap').innerHTML =
+        '<canvas id="savingsChart" height="70"></canvas>';
+
+    if (savingsChart) { savingsChart.destroy(); savingsChart = null; }
+    savingsChart = new Chart(document.getElementById('savingsChart'), {
+        type: 'line',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                label: 'Savings Rate %',
+                data: savingsRates12,
+                borderColor: '#c9963a',
+                backgroundColor: 'rgba(201,150,58,0.08)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: '#c9963a',
+                pointBorderColor: '#07080a',
+                pointBorderWidth: 1.5,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    ...TOOLTIP_CFG,
+                    callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)}%` }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: GRID_COLOR },
+                    ticks: { color: TICK_COLOR, font: { family: 'Inter', size: 10 } }
+                },
+                y: {
+                    grid: { color: GRID_COLOR },
+                    ticks: {
+                        color: TICK_COLOR,
+                        font: { family: 'Inter', size: 10 },
+                        callback: v => v + '%'
+                    },
+                    suggestedMin: -20,
+                    suggestedMax: 100
+                }
+            },
+            animation: { duration: 700 },
+            backgroundColor: 'transparent'
+        }
+    });
+
+    /* ── Top 8 merchants ─────────────────────────── */
+    const merchantMap = {};
+    txns.filter(t => t.type === 'expense').forEach(t => {
+        const name = parseMerchant(t.description);
+        merchantMap[name] = (merchantMap[name] || 0) + t.amount;
+    });
+    const topMerchants = Object.entries(merchantMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+    const maxMerchant = topMerchants[0]?.[1] || 1;
+
+    document.getElementById('merchantList').innerHTML = topMerchants.length
+        ? topMerchants.map(([name, amt], i) => `
+            <div class="merchant-row">
+                <span class="merchant-rank">${i + 1}</span>
+                <span class="merchant-name" title="${name}">${name}</span>
+                <div class="merchant-bar-wrap">
+                    <div class="merchant-bar" style="width:${(amt / maxMerchant * 100).toFixed(1)}%"></div>
+                </div>
+                <span class="merchant-amt">${fmtRupee(amt)}</span>
+            </div>`).join('')
+        : '<p style="color:var(--text-muted);font-size:0.82rem">No expense data available.</p>';
+
+    /* ── Category heatmap ────────────────────────── */
+    const catMap = {};
+    txns.filter(t => t.type === 'expense').forEach(t => {
+        const cat = t.category || 'Uncategorised';
+        catMap[cat] = (catMap[cat] || 0) + t.amount;
+    });
+    const totalExpAll = Object.values(catMap).reduce((s, v) => s + v, 0) || 1;
+    const catArr = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+
+    document.getElementById('catHeatmap').innerHTML = catArr.length
+        ? `<div class="cat-grid">` + catArr.map(([cat, amt]) => {
+            const pct = (amt / totalExpAll * 100).toFixed(1);
+            return `
+                <div class="cat-heat-card">
+                    <div class="cat-heat-name">${cat}</div>
+                    <div class="cat-heat-amt">${fmtRupee(amt)}</div>
+                    <div class="cat-heat-pct">${pct}% of total expenses</div>
+                    <div class="cat-heat-bar-wrap">
+                        <div class="cat-heat-bar" style="width:${pct}%"></div>
+                    </div>
+                </div>`;
+        }).join('') + `</div>`
+        : '<p style="color:var(--text-muted);font-size:0.82rem">No expense data available.</p>';
+
+    /* ── Best & Worst month ──────────────────────── */
+    const monthEntries = Object.entries(byMonth).map(([m, v]) => {
+        const savings = v.inc - v.exp;
+        const rate    = v.inc > 0 ? (savings / v.inc * 100) : (savings < 0 ? -100 : 0);
+        return { month: m, inc: v.inc, exp: v.exp, savings, rate };
+    });
+
+    let best  = null, worst = null;
+    if (monthEntries.length) {
+        best  = monthEntries.reduce((a, b) => b.savings > a.savings ? b : a);
+        worst = monthEntries.reduce((a, b) => b.savings < a.savings ? b : a);
+    }
+
+    function monthLabel(key) {
+        if (!key) return '—';
+        const [y, m] = key.split('-');
+        return new Date(+y, +m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    }
+
+    document.getElementById('bestWorstRow').innerHTML = best && worst ? `
+        <div class="bw-card best">
+            <h3>Best Month</h3>
+            <span class="bw-badge best">Highest Savings</span>
+            <div class="bw-month-label">${monthLabel(best.month)}</div>
+            <div class="bw-stats">
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Income</span>
+                    <span class="bw-val" style="color:var(--income)">${fmtRupee(best.inc)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Expenses</span>
+                    <span class="bw-val" style="color:var(--expense)">${fmtRupee(best.exp)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Saved</span>
+                    <span class="bw-val" style="color:var(--emerald)">${fmtRupee(best.savings)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Savings Rate</span>
+                    <span class="bw-val" style="color:var(--gold)">${best.rate.toFixed(1)}%</span>
+                </div>
+            </div>
+        </div>
+        <div class="bw-card worst">
+            <h3>Worst Month</h3>
+            <span class="bw-badge worst">Lowest Savings</span>
+            <div class="bw-month-label">${monthLabel(worst.month)}</div>
+            <div class="bw-stats">
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Income</span>
+                    <span class="bw-val" style="color:var(--income)">${fmtRupee(worst.inc)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Expenses</span>
+                    <span class="bw-val" style="color:var(--expense)">${fmtRupee(worst.exp)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Saved</span>
+                    <span class="bw-val" style="color:${worst.savings >= 0 ? 'var(--emerald)' : 'var(--expense)'}">${fmtRupee(worst.savings)}</span>
+                </div>
+                <div class="bw-stat-row">
+                    <span class="bw-lbl">Savings Rate</span>
+                    <span class="bw-val" style="color:var(--gold)">${worst.rate.toFixed(1)}%</span>
+                </div>
+            </div>
+        </div>`
+        : `<div style="grid-column:1/-1">
+               <div class="empty-analytics">
+                   <p>Not enough monthly data to determine best and worst months.</p>
+               </div>
+           </div>`;
+}
+
+loadAnalytics();
+</script>
+</body>
+</html>

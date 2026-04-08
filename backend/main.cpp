@@ -8,6 +8,7 @@
 #include "routes/portfolio.h"
 #include "routes/news.h"
 #include "routes/goals.h"
+#include "routes/budget.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -32,6 +33,7 @@ int main() {
     createUserTable(db);
     createPortfolioTables(db);
     createGoalsTable(db);
+    createBudgetsTable(db);
     std::cout << "[DB] finance.db ready\n";
 
     crow::SimpleApp app;
@@ -70,6 +72,15 @@ int main() {
     CROW_ROUTE(app, "/goals")([]() {
         return serveFile("frontend/goals.html", "text/html");
     });
+    CROW_ROUTE(app, "/report")([]() {
+        return serveFile("frontend/report.html", "text/html");
+    });
+    CROW_ROUTE(app, "/analytics")([]() {
+        return serveFile("frontend/analytics.html", "text/html");
+    });
+    CROW_ROUTE(app, "/budget")([]() {
+        return serveFile("frontend/budget.html", "text/html");
+    });
 
     // ---- API routes ----
     setupTransactionRoutes(app, db);
@@ -79,6 +90,7 @@ int main() {
     setupPortfolioRoutes(app, db);
     setupNewsRoutes(app, db);
     setupGoalsRoutes(app, db);
+    setupBudgetRoutes(app, db);
 
     std::cout << "[Server] Running on http://localhost:8080\n";
     app.port(8080).multithreaded().run();

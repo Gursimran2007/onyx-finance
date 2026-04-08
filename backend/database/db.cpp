@@ -300,3 +300,59 @@ void deleteGoal(SQLite::Database& db, int goalId) {
     q.bind(1, goalId);
     q.exec();
 }
+
+// ---- Budgets ----
+
+void createBudgetsTable(SQLite::Database& db) {
+    db.exec(
+        "CREATE TABLE IF NOT EXISTS budgets ("
+        "id            INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "user_id       INTEGER NOT NULL,"
+        "category      TEXT    NOT NULL,"
+        "monthly_limit REAL    NOT NULL DEFAULT 0,"
+        "UNIQUE(user_id, category)"
+        ");"
+    );
+}
+
+void upsertBudget(SQLite::Database& db, int userId, const std::string& category, double monthlyLimit) {
+    SQLite::Statement q(db,
+        "INSERT INTO budgets (user_id, category, monthly_limit) VALUES (?, ?, ?) "
+        "ON CONFLICT(user_id, category) DO UPDATE SET monthly_limit = excluded.monthly_limit"
+    );
+    q.bind(1, userId);
+    q.bind(2, category);
+    q.bind(3, monthlyLimit);
+    q.exec();
+}
+
+std::vector<json> getBudgets(SQLite::Database& db, int userId, const std::string& currentMonth) {
+    std::vector<json> results;
+    // Get budgets with this-month spending joined
+    SQLite::Statement q(db,
+        "SELECT b.id, b.category, b.monthly_limit, "
+        "COALESCE((SELECT SUM(t.amount) FROM transactions t "
+        "  WHERE t.user_id = b.user_id AND t.category = b.category "
+        "  AND t.type = 'expense' AND t.date LIKE ?), 0) as spent "
+        "FROM budgets b WHERE b.user_id = ? ORDER BY b.category"
+    );
+    std::string pattern = currentMonth + "%";
+    q.bind(1, pattern);
+    q.bind(2, userId);
+    while (q.executeStep()) {
+        json obj;
+        obj["id"]           = q.getColumn(0).getInt();
+        obj["category"]     = q.getColumn(1).getString();
+        obj["monthlyLimit"] = q.getColumn(2).getDouble();
+        obj["spent"]        = q.getColumn(3).getDouble();
+        results.push_back(obj);
+    }
+    return results;
+}
+
+void deleteBudget(SQLite::Database& db, int budgetId, int userId) {
+    SQLite::Statement q(db, "DELETE FROM budgets WHERE id = ? AND user_id = ?");
+    q.bind(1, budgetId);
+    q.bind(2, userId);
+    q.exec();
+}
