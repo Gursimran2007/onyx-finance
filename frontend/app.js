@@ -102,29 +102,41 @@ function buildDonut(txns) {
     }
 }
 
+let _lineChartInst = null;
 function buildLine(txns) {
     const ctx = document.getElementById('lineChart');
     if (!ctx) return;
-    const expenses = txns.filter(t => t.type === 'expense');
-    const byDate = {};
-    expenses.forEach(t => { byDate[t.date] = (byDate[t.date] || 0) + t.amount; });
-    const sorted = Object.keys(byDate).sort();
-    if (sorted.length < 2) return;
+    if (_lineChartInst) { _lineChartInst.destroy(); _lineChartInst = null; }
 
-    new Chart(ctx, {
-        type: 'line',
+    const expenses = txns.filter(t => t.type === 'expense');
+
+    // Group by MONTH (YYYY-MM) — individual days produce hundreds of noisy points
+    const byMonth = {};
+    expenses.forEach(t => {
+        const m = t.date?.slice(0, 7);
+        if (m) byMonth[m] = (byMonth[m] || 0) + t.amount;
+    });
+    const sorted = Object.keys(byMonth).sort();
+    if (sorted.length < 1) return;
+
+    const labels = sorted.map(m => {
+        const [y, mo] = m.split('-');
+        return new Date(+y, +mo - 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+    });
+
+    _lineChartInst = new Chart(ctx, {
+        type: 'bar',
         data: {
-            labels: sorted.map(d => d.slice(5)),
+            labels,
             datasets: [{
-                label: 'Expenses',
-                data: sorted.map(d => byDate[d]),
-                borderColor: '#e2e8f0',
-                backgroundColor: 'rgba(226,232,240,0.04)',
+                label: 'Monthly Expenses',
+                data: sorted.map(m => byMonth[m]),
+                backgroundColor: 'rgba(201,150,58,0.22)',
+                borderColor:     'rgba(201,150,58,0.75)',
                 borderWidth: 1.5,
-                pointRadius: 3,
-                pointBackgroundColor: '#e2e8f0',
-                fill: true,
-                tension: 0.4
+                borderRadius: 5,
+                borderSkipped: false,
+                hoverBackgroundColor: 'rgba(201,150,58,0.4)'
             }]
         },
         options: {
@@ -132,13 +144,13 @@ function buildLine(txns) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    callbacks: { label: ctx => ` ${fmt(ctx.raw)}` },
+                    callbacks: { label: c => ` ${fmt(c.raw)}` },
                     backgroundColor: '#0d0f12', borderColor: '#1a1d22', borderWidth: 1,
                     titleColor: '#f1f5f9', bodyColor: '#8892a4', padding: 10
                 }
             },
             scales: {
-                x: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 } } },
+                x: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 }, maxRotation: 45 } },
                 y: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 },
                     callback: v => '₹' + v.toLocaleString('en-IN') }}
             },

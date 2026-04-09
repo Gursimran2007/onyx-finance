@@ -20,14 +20,27 @@
         .add-stock-row input { margin-bottom:0; }
         .btn-sm { padding:0.7rem 1rem; background:var(--text-primary); color:var(--bg-base); border:none; border-radius:10px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
         .btn-sm:hover { background:#cbd5e1; }
-        .stock-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr auto; gap:1rem; align-items:center; padding:1rem 1.4rem; border-top:1px solid var(--border); }
+        .stock-row { display:grid; grid-template-columns:1.2fr 0.8fr 1fr 1fr 1.2fr auto; gap:1rem; align-items:center; padding:1rem 1.4rem; border-top:1px solid var(--border); }
         .stock-row:hover { background:var(--bg-hover); }
         .stock-sym { font-weight:700; font-size:0.9rem; color:var(--text-primary); }
-        .stock-name { font-size:0.82rem; color:var(--text-muted); }
+        .stock-name { font-size:0.78rem; color:var(--text-muted); margin-top:1px; }
         .stock-price { font-family:'JetBrains Mono',monospace; font-size:0.9rem; }
         .pnl.pos { color:var(--income); }
         .pnl.neg { color:var(--expense); }
-        .loading-price { color:var(--text-muted); font-size:0.8rem; }
+        .loading-price { color:var(--text-muted); font-size:0.8rem; font-style:italic; }
+        .price-na { color:var(--text-muted); font-size:0.8rem; }
+
+        /* Growth chart card */
+        .growth-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.4rem; margin-bottom:1.5rem; }
+        .growth-card h4 { font-size:0.75rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:1rem; }
+        .growth-meta { display:flex; gap:1.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+        .growth-stat { font-size:0.8rem; }
+        .growth-stat .gs-label { color:var(--text-muted); font-size:0.7rem; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; }
+        .growth-stat .gs-val { font-family:'JetBrains Mono',monospace; font-size:0.95rem; }
+        .growth-stat .gs-val.pos { color:var(--income); }
+        .growth-stat .gs-val.neg { color:var(--expense); }
+        .chart-loading { color:var(--text-muted); font-size:0.8rem; text-align:center; padding:2rem; }
+
         .sip-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.5rem; }
         .sip-inputs { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.8rem; margin-bottom:1rem; }
         .sip-result { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1.2rem; text-align:center; }
@@ -93,14 +106,42 @@
         </div>
     </div>
     <div class="table-wrap" id="stocksTable">
-        <div style="padding:1rem 1.4rem;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);background:var(--bg-base);display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:1rem">
-            <span>Symbol</span><span>Qty</span><span>Avg Price</span><span>LTP</span><span>P&L</span><span></span>
+        <div style="padding:1rem 1.4rem;font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);background:var(--bg-base);display:grid;grid-template-columns:1.2fr 0.8fr 1fr 1fr 1.2fr auto;gap:1rem">
+            <span>Symbol</span><span>Qty</span><span>Avg Price</span><span>LTP</span><span>P&amp;L</span><span></span>
         </div>
         <div id="stocksList"><div class="empty"><div class="empty-icon">◈</div><p>No stocks added yet</p></div></div>
     </div>
 
-    <!-- MF -->
+    <!-- Portfolio Growth Chart -->
     <div class="section-header" style="margin-top:1.5rem">
+        <h3>Portfolio Growth (1 Year)</h3>
+    </div>
+    <div class="growth-card" id="growthCard">
+        <h4>Portfolio Value vs Invested</h4>
+        <div class="growth-meta" id="growthMeta" style="display:none">
+            <div class="growth-stat">
+                <div class="gs-label">Invested</div>
+                <div class="gs-val" id="gmInvested">—</div>
+            </div>
+            <div class="growth-stat">
+                <div class="gs-label">Current Value</div>
+                <div class="gs-val" id="gmCurrent">—</div>
+            </div>
+            <div class="growth-stat">
+                <div class="gs-label">Overall P&amp;L</div>
+                <div class="gs-val" id="gmPnl">—</div>
+            </div>
+            <div class="growth-stat">
+                <div class="gs-label">Return</div>
+                <div class="gs-val" id="gmPct">—</div>
+            </div>
+        </div>
+        <div class="chart-loading" id="growthStatus">Add stocks to see your portfolio growth chart.</div>
+        <canvas id="portfolioChart" height="110" style="display:none"></canvas>
+    </div>
+
+    <!-- MF -->
+    <div class="section-header" style="margin-top:0.5rem">
         <h3>Mutual Fund NAV Lookup</h3>
     </div>
     <div class="form-card" style="max-width:100%;margin-bottom:1.5rem">
@@ -131,105 +172,332 @@
 <script src="/app.js"></script>
 <script>
     requireAuth();
-    const token = getToken();
-    const name  = localStorage.getItem('onyx_name') || 'Account';
+    const name = localStorage.getItem('onyx_name') || 'Account';
     document.getElementById('userLabel').textContent = name + ' ↗';
 
-    function fmt(n) { return '₹' + Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function fmt(n)      { return '₹' + Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function fmtShort(n) { return '₹' + Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:0}); }
 
+    let _growthChart   = null;
+    let _stockValues   = [];   // [{symbol,name,invested,current}] — populated as prices come in
+
+    // ── Load portfolio ─────────────────────────────────────────────
     async function loadPortfolio() {
-        // Cash balance from summary
         try {
-            const s = await (await fetch('/api/summary')).json();
-            document.getElementById('cashBalance').textContent = fmt(s.balance);
-
-            // Stocks
-            const stocks = await (await fetch('/api/portfolio/stocks', { headers: authHeaders() })).json();
-            renderStocks(stocks);
-
-            // Net worth (cash + stock values — we update stock values async)
-            updateNetWorth(s.balance, 0, 0);
+            const [summRes, stocksRes] = await Promise.all([
+                fetch('/api/summary',           { headers: authHeaders() }),
+                fetch('/api/portfolio/stocks',  { headers: authHeaders() })
+            ]);
+            const s      = await summRes.json();
+            const stocks = await stocksRes.json();
+            document.getElementById('cashBalance').textContent = fmt(s.balance || 0);
+            updateNetWorth(s.balance || 0, 0, 0);
+            renderStocks(Array.isArray(stocks) ? stocks : []);
         } catch(e) { console.error(e); }
     }
 
     function updateNetWorth(cash, stocks, mf) {
         const total = cash + stocks + mf;
-        document.getElementById('netWorth').textContent  = fmt(total);
-        document.getElementById('stockValue').textContent = fmt(stocks);
-        document.getElementById('mfValue').textContent   = fmt(mf);
+        document.getElementById('netWorth').textContent    = fmt(total);
+        document.getElementById('stockValue').textContent  = fmt(stocks);
+        document.getElementById('mfValue').textContent     = fmt(mf);
         document.getElementById('cashBalance').textContent = fmt(cash);
     }
 
+    // ── Render stock rows + kick off price fetches ────────────────
     function renderStocks(stocks) {
         const el = document.getElementById('stocksList');
-        if (!stocks.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">◈</div><p>No stocks added yet</p></div>'; return; }
+        if (!stocks.length) {
+            el.innerHTML = '<div class="empty"><div class="empty-icon">◈</div><p>No stocks added yet</p></div>';
+            document.getElementById('growthStatus').textContent = 'Add stocks to see your portfolio growth chart.';
+            return;
+        }
+
         el.innerHTML = stocks.map(s => `
             <div class="stock-row" id="stock-${s.id}">
                 <div><div class="stock-sym">${s.symbol}</div><div class="stock-name">${s.name}</div></div>
                 <div style="font-family:'JetBrains Mono',monospace">${s.qty}</div>
                 <div style="font-family:'JetBrains Mono',monospace">${fmt(s.avgPrice)}</div>
-                <div class="stock-price loading-price" id="ltp-${s.id}">Fetching...</div>
+                <div class="stock-price loading-price" id="ltp-${s.id}">Fetching…</div>
                 <div class="pnl" id="pnl-${s.id}">—</div>
                 <button class="btn-del" onclick="removeStock(${s.id})">✕</button>
             </div>`).join('');
 
-        // Fetch live prices
-        let totalStockVal = 0;
-        let fetched = 0;
-        stocks.forEach(async s => {
+        document.getElementById('growthStatus').textContent = 'Loading prices…';
+
+        _stockValues = stocks.map(s => ({
+            symbol: s.symbol, name: s.name,
+            invested: s.qty * s.avgPrice, current: null
+        }));
+
+        let totalStockVal = 0, fetched = 0;
+
+        stocks.forEach(async (s, idx) => {
+            let ltp = null;
             try {
-                const r = await fetch(`/api/portfolio/price/${s.symbol}`, { headers: authHeaders() });
+                const ctrl  = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 12000);
+                const r     = await fetch(`/api/portfolio/price/${encodeURIComponent(s.symbol)}`, {
+                    headers: authHeaders(), signal: ctrl.signal
+                });
+                clearTimeout(timer);
                 const d = await r.json();
-                if (d.price) {
-                    const ltp = d.price;
-                    const invested = s.qty * s.avgPrice;
-                    const current  = s.qty * ltp;
-                    const pnl      = current - invested;
-                    const pct      = ((pnl / invested) * 100).toFixed(2);
-                    document.getElementById(`ltp-${s.id}`).textContent = fmt(ltp);
-                    document.getElementById(`ltp-${s.id}`).classList.remove('loading-price');
-                    const pnlEl = document.getElementById(`pnl-${s.id}`);
-                    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt(pnl) + ` (${pct}%)`;
-                    pnlEl.className = 'pnl ' + (pnl >= 0 ? 'pos' : 'neg');
-                    totalStockVal += current;
-                }
+                if (d.price && !isNaN(d.price)) ltp = d.price;
             } catch {}
+
+            if (ltp !== null) {
+                const invested = s.qty * s.avgPrice;
+                const current  = s.qty * ltp;
+                const pnl      = current - invested;
+                const pct      = ((pnl / invested) * 100).toFixed(2);
+                const ltpEl    = document.getElementById(`ltp-${s.id}`);
+                const pnlEl    = document.getElementById(`pnl-${s.id}`);
+                if (ltpEl) { ltpEl.textContent = fmt(ltp); ltpEl.classList.remove('loading-price'); }
+                if (pnlEl) {
+                    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt(pnl) + ` (${pct}%)`;
+                    pnlEl.className   = 'pnl ' + (pnl >= 0 ? 'pos' : 'neg');
+                }
+                totalStockVal          += current;
+                _stockValues[idx].current = current;
+            } else {
+                const ltpEl = document.getElementById(`ltp-${s.id}`);
+                const pnlEl = document.getElementById(`pnl-${s.id}`);
+                if (ltpEl) { ltpEl.textContent = 'N/A'; ltpEl.className = 'stock-price price-na'; }
+                if (pnlEl)   pnlEl.textContent = '—';
+            }
+
             fetched++;
             if (fetched === stocks.length) {
-                const cash = parseFloat(document.getElementById('cashBalance').textContent.replace(/[₹,]/g,'')) || 0;
+                const cash = parseFloat(
+                    document.getElementById('cashBalance').textContent.replace(/[₹,]/g, '')
+                ) || 0;
                 updateNetWorth(cash, totalStockVal, 0);
+                // Phase 1: immediate bar chart with P&L per stock
+                buildComparisonChart(_stockValues);
+                // Phase 2: try to upgrade to time-series line chart
+                tryBuildTimeseriesChart(stocks);
             }
         });
     }
 
+    // ── Phase 1: Invested vs Current per stock (always works) ─────
+    function buildComparisonChart(stockVals) {
+        const hasAny = stockVals.some(s => s.current !== null);
+        if (!hasAny) {
+            document.getElementById('growthStatus').textContent = 'Could not fetch live prices.';
+            return;
+        }
+
+        const statusEl  = document.getElementById('growthStatus');
+        const canvasEl  = document.getElementById('portfolioChart');
+        const metaEl    = document.getElementById('growthMeta');
+
+        const vals     = stockVals.filter(s => s.current !== null);
+        const totInv   = vals.reduce((a, s) => a + s.invested, 0);
+        const totCur   = vals.reduce((a, s) => a + s.current, 0);
+        const totPnl   = totCur - totInv;
+        const totPct   = totInv > 0 ? ((totPnl / totInv) * 100).toFixed(2) : '0.00';
+        const isGain   = totPnl >= 0;
+
+        metaEl.style.display = 'flex';
+        document.getElementById('gmInvested').textContent = fmtShort(totInv);
+        document.getElementById('gmCurrent').textContent  = fmtShort(totCur);
+        const pnlEl = document.getElementById('gmPnl');
+        pnlEl.textContent = (isGain ? '+' : '') + fmtShort(totPnl);
+        pnlEl.className   = 'gs-val ' + (isGain ? 'pos' : 'neg');
+        const pctEl = document.getElementById('gmPct');
+        pctEl.textContent = (isGain ? '+' : '') + totPct + '%';
+        pctEl.className   = 'gs-val ' + (isGain ? 'pos' : 'neg');
+
+        statusEl.textContent = '';
+        canvasEl.style.display = 'block';
+
+        const labels   = vals.map(s => s.symbol.replace('.NS','').replace('.BO',''));
+        const invested = vals.map(s => s.invested);
+        const currents = vals.map(s => s.current);
+        const barColors = vals.map(s => s.current >= s.invested
+            ? 'rgba(52,211,153,0.7)' : 'rgba(248,113,113,0.7)');
+
+        if (_growthChart) { _growthChart.destroy(); _growthChart = null; }
+
+        _growthChart = new Chart(canvasEl, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Invested',
+                        data: invested,
+                        backgroundColor: 'rgba(201,150,58,0.35)',
+                        borderColor:     'rgba(201,150,58,0.8)',
+                        borderWidth: 1.5,
+                        borderRadius: 4,
+                        order: 2
+                    },
+                    {
+                        label: 'Current Value',
+                        data: currents,
+                        backgroundColor: barColors,
+                        borderColor:     barColors.map(c => c.replace('0.7','1')),
+                        borderWidth: 1.5,
+                        borderRadius: 4,
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, labels: { color: '#8892a4', font: { size: 11 }, boxWidth: 12 } },
+                    tooltip: {
+                        callbacks: { label: c => ` ${c.dataset.label}: ${fmtShort(c.raw)}` },
+                        backgroundColor: '#0d0f12', borderColor: '#1a1d22', borderWidth: 1,
+                        titleColor: '#f1f5f9', bodyColor: '#8892a4', padding: 10
+                    }
+                },
+                scales: {
+                    x: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 } } },
+                    y: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 },
+                            callback: v => '₹' + v.toLocaleString('en-IN') } }
+                },
+                animation: { duration: 700 }
+            }
+        });
+    }
+
+    // ── Phase 2: Try 1-year timeseries (requires Yahoo Finance history) ─
+    async function tryBuildTimeseriesChart(stocks) {
+        const allByDate = {};
+        const totalInvested = stocks.reduce((a, s) => a + s.qty * s.avgPrice, 0);
+
+        const results = await Promise.allSettled(
+            stocks.map(async s => {
+                const ctrl  = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 15000);
+                try {
+                    const r    = await fetch(`/api/portfolio/history/${encodeURIComponent(s.symbol)}`, {
+                        headers: authHeaders(), signal: ctrl.signal
+                    });
+                    clearTimeout(timer);
+                    const hist = await r.json();
+                    if (!Array.isArray(hist) || hist.length < 2) return;
+                    hist.forEach(pt => {
+                        if (!pt.date || !pt.close) return;
+                        allByDate[pt.date] = (allByDate[pt.date] || 0) + s.qty * pt.close;
+                    });
+                } catch { clearTimeout(timer); }
+            })
+        );
+
+        const dates = Object.keys(allByDate).sort();
+        if (dates.length < 4) return;  // Not enough → keep bar chart
+
+        const values   = dates.map(d => allByDate[d]);
+        const lastVal  = values[values.length - 1];
+        const pnl      = lastVal - totalInvested;
+        const pct      = ((pnl / totalInvested) * 100).toFixed(2);
+        const isGain   = pnl >= 0;
+        const lineColor = isGain ? '#34d399' : '#f87171';
+        const fillColor = isGain ? 'rgba(52,211,153,0.07)' : 'rgba(248,113,113,0.07)';
+
+        // Update meta with time-series final value
+        document.getElementById('gmCurrent').textContent = fmtShort(lastVal);
+        const pnlEl = document.getElementById('gmPnl');
+        pnlEl.textContent = (isGain ? '+' : '') + fmtShort(pnl);
+        pnlEl.className   = 'gs-val ' + (isGain ? 'pos' : 'neg');
+        const pctEl = document.getElementById('gmPct');
+        pctEl.textContent = (isGain ? '+' : '') + pct + '%';
+        pctEl.className   = 'gs-val ' + (isGain ? 'pos' : 'neg');
+
+        const labels = dates.map(d => {
+            const [y, mo] = d.split('-');
+            return new Date(+y, +mo-1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        });
+
+        if (_growthChart) { _growthChart.destroy(); _growthChart = null; }
+        const canvasEl = document.getElementById('portfolioChart');
+
+        _growthChart = new Chart(canvasEl, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Portfolio Value',
+                        data: values,
+                        borderColor: lineColor,
+                        backgroundColor: fillColor,
+                        borderWidth: 2.5,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        fill: true,
+                        tension: 0.35,
+                        order: 1
+                    },
+                    {
+                        label: 'Amount Invested',
+                        data: dates.map(() => totalInvested),
+                        borderColor: 'rgba(201,150,58,0.5)',
+                        borderWidth: 1.5,
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0,
+                        order: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, labels: { color: '#8892a4', font: { size: 11 }, boxWidth: 14 } },
+                    tooltip: {
+                        callbacks: { label: c => ` ${c.dataset.label}: ${fmtShort(c.raw)}` },
+                        backgroundColor: '#0d0f12', borderColor: '#1a1d22', borderWidth: 1,
+                        titleColor: '#f1f5f9', bodyColor: '#8892a4', padding: 10
+                    }
+                },
+                scales: {
+                    x: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 }, maxTicksLimit: 13 } },
+                    y: { grid: { color: '#1a1d22' }, ticks: { color: '#3d4450', font: { size: 10 },
+                            callback: v => '₹' + v.toLocaleString('en-IN') } }
+                },
+                animation: { duration: 900 }
+            }
+        });
+    }
+
+    // ── Add / Remove ───────────────────────────────────────────────
     async function addStock() {
-        const sym = document.getElementById('stockSymbol').value.trim().toUpperCase();
-        const name = document.getElementById('stockName').value.trim();
+        const sym  = document.getElementById('stockSymbol').value.trim().toUpperCase();
+        const nm   = document.getElementById('stockName').value.trim();
         const qty  = parseFloat(document.getElementById('stockQty').value);
         const avg  = parseFloat(document.getElementById('stockAvg').value);
         if (!sym || !qty || !avg) return alert('Fill all fields');
         await fetch('/api/portfolio/stocks', {
-            method:'POST', headers: authHeaders(),
-            body: JSON.stringify({ symbol:sym, name, qty, avgPrice:avg })
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ symbol: sym, name: nm, qty, avgPrice: avg })
         });
-        document.getElementById('stockSymbol').value = '';
-        document.getElementById('stockName').value = '';
-        document.getElementById('stockQty').value = '';
-        document.getElementById('stockAvg').value = '';
+        ['stockSymbol','stockName','stockQty','stockAvg'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
         loadPortfolio();
     }
 
     async function removeStock(id) {
-        await fetch(`/api/portfolio/stocks/${id}`, { method:'DELETE', headers: authHeaders() });
+        await fetch(`/api/portfolio/stocks/${id}`, { method: 'DELETE', headers: authHeaders() });
         loadPortfolio();
     }
 
+    // ── MF Lookup ──────────────────────────────────────────────────
     async function lookupMF() {
         const code = document.getElementById('mfCode').value.trim();
         if (!code) return;
         const el = document.getElementById('mfResult');
         el.style.display = 'block';
-        el.textContent = 'Fetching NAV...';
+        el.textContent = 'Fetching NAV…';
         try {
             const r = await fetch(`/api/portfolio/mf/${code}`, { headers: authHeaders() });
             const d = await r.json();
@@ -240,12 +508,13 @@
         } catch { el.textContent = 'Could not fetch NAV.'; }
     }
 
+    // ── SIP Calculator ─────────────────────────────────────────────
     function calcSIP() {
         const P = parseFloat(document.getElementById('sipAmount').value) || 0;
         const r = (parseFloat(document.getElementById('sipRate').value) || 0) / 100 / 12;
         const n = (parseFloat(document.getElementById('sipYears').value) || 0) * 12;
-        if (!P || !r || !n) { document.getElementById('sipResults').style.display='none'; return; }
-        const total    = P * (((Math.pow(1+r, n) - 1) / r) * (1+r));
+        if (!P || !r || !n) { document.getElementById('sipResults').style.display = 'none'; return; }
+        const total    = P * (((Math.pow(1 + r, n) - 1) / r) * (1 + r));
         const invested = P * n;
         const gains    = total - invested;
         document.getElementById('sipTotal').textContent    = fmt(total);
