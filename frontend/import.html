@@ -494,19 +494,28 @@ Rs 1240 Debited from SBI A/c XXXX6789 on 07-03-26. Info: APOLLO PHARMACY. Avl Ba
             pfParsed.push({ symbol, name, qty, avgPrice });
         }
 
-        document.getElementById('pfImportBtn').disabled = pfParsed.length === 0;
         const preview = document.getElementById('pfPreview');
-        if (pfParsed.length) {
-            document.getElementById('pfCount').textContent = pfParsed.length + ' stocks parsed';
-            document.getElementById('pfTableBody').innerHTML = pfParsed.map(s => `
-                <tr>
-                    <td style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:0.8rem">${s.symbol}</td>
-                    <td style="color:var(--text-primary)">${s.name}</td>
-                    <td style="font-family:'JetBrains Mono',monospace">${s.qty}</td>
-                    <td style="font-family:'JetBrains Mono',monospace">₹${s.avgPrice.toLocaleString('en-IN')}</td>
-                </tr>`).join('');
+        const importBtn = document.getElementById('pfImportBtn');
+
+        if (pfParsed.length === 0) {
+            // Wrong file or no valid rows — show error, hide old preview
             preview.style.display = 'block';
+            document.getElementById('pfCount').innerHTML = '<span style="color:var(--expense)">No portfolio data found.</span> Make sure your CSV has columns: <strong>Symbol, Name, Qty, AvgPrice</strong>';
+            document.getElementById('pfTableBody').innerHTML = '';
+            importBtn.disabled = true;
+            return;
         }
+
+        importBtn.disabled = false;
+        document.getElementById('pfCount').textContent = pfParsed.length + ' stocks parsed';
+        document.getElementById('pfTableBody').innerHTML = pfParsed.map(s => `
+            <tr>
+                <td style="color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:0.8rem">${s.symbol}</td>
+                <td style="color:var(--text-primary)">${s.name}</td>
+                <td style="font-family:'JetBrains Mono',monospace">${s.qty}</td>
+                <td style="font-family:'JetBrains Mono',monospace">₹${s.avgPrice.toLocaleString('en-IN')}</td>
+            </tr>`).join('');
+        preview.style.display = 'block';
     }
     async function doPFImport() {
         if (!pfParsed.length) return;

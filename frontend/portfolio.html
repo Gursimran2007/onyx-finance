@@ -47,6 +47,15 @@
         .sip-result .r-val { font-family:'JetBrains Mono',monospace; font-size:1.6rem; font-weight:500; color:var(--income); }
         .sip-result .r-label { font-size:0.75rem; color:var(--text-muted); margin-top:0.3rem; }
         .sip-results-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.8rem; }
+
+        /* Sub-page nav tabs */
+        .portfolio-tabs { display:flex; gap:0.8rem; margin-bottom:1.5rem; }
+        .portfolio-tab { flex:1; display:flex; align-items:center; gap:0.8rem; padding:1rem 1.4rem; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; text-decoration:none; color:var(--text-secondary); transition:all 0.2s; cursor:pointer; }
+        .portfolio-tab:hover { border-color:var(--gold); color:var(--text-primary); background:var(--bg-hover); }
+        .portfolio-tab .tab-icon { font-size:1.4rem; }
+        .portfolio-tab .tab-info h4 { font-size:0.85rem; font-weight:600; color:var(--text-primary); margin:0; }
+        .portfolio-tab .tab-info p { font-size:0.72rem; color:var(--text-muted); margin:0.15rem 0 0; }
+        .portfolio-tab .tab-arrow { margin-left:auto; font-size:0.9rem; color:var(--text-muted); }
     </style>
 </head>
 <body>
@@ -68,6 +77,26 @@
     <div class="page-header">
         <h1>Portfolio</h1>
         <p>Stocks, mutual funds & net worth</p>
+    </div>
+
+    <!-- Sub-page links -->
+    <div class="portfolio-tabs">
+        <a href="/investor" class="portfolio-tab">
+            <span class="tab-icon">&#9670;</span>
+            <div class="tab-info">
+                <h4>AI Investor</h4>
+                <p>Portfolio analysis, target allocation & recommendations</p>
+            </div>
+            <span class="tab-arrow">&rarr;</span>
+        </a>
+        <a href="/trader" class="portfolio-tab">
+            <span class="tab-icon">&#9656;</span>
+            <div class="tab-info">
+                <h4>AI Trader</h4>
+                <p>Trade signals, strategies & execution</p>
+            </div>
+            <span class="tab-arrow">&rarr;</span>
+        </a>
     </div>
 
     <!-- Net Worth -->

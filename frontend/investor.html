@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Onyx — AI Investor</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .investor-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        .full-width { grid-column:1/-1; }
+        .section-box { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:1.4rem; }
+        .section-box h3 { font-size:0.75rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:1rem; }
+
+        /* Performance stats */
+        .perf-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.2rem; }
+        .perf-stat { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1rem; text-align:center; }
+        .perf-stat .label { font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.3rem; }
+        .perf-stat .value { font-family:'JetBrains Mono',monospace; font-size:1.1rem; font-weight:600; color:var(--text-primary); }
+        .perf-stat .value.positive { color:var(--income); }
+        .perf-stat .value.negative { color:var(--expense); }
+
+        /* Stock analysis rows */
+        .stock-analysis { display:flex; flex-direction:column; gap:0.6rem; }
+        .sa-row { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1rem 1.2rem; display:grid; grid-template-columns:1fr 0.8fr 0.8fr 0.8fr 0.8fr; gap:0.8rem; align-items:center; }
+        .sa-row:hover { border-color:var(--border-mid); }
+        .sa-sym { font-family:'JetBrains Mono',monospace; font-weight:700; font-size:0.9rem; color:var(--text-primary); }
+        .sa-name { font-size:0.7rem; color:var(--text-muted); }
+        .sa-val { font-family:'JetBrains Mono',monospace; font-size:0.85rem; }
+        .sa-label { font-size:0.65rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
+
+        /* Recommendation cards */
+        .rec-list { display:flex; flex-direction:column; gap:0.75rem; }
+        .rec-card { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1rem 1.2rem; transition:border-color 0.2s; }
+        .rec-card:hover { border-color:var(--border-mid); }
+        .rec-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; }
+        .rec-symbol { font-family:'JetBrains Mono',monospace; font-weight:600; font-size:0.95rem; }
+        .rec-action { font-family:'JetBrains Mono',monospace; font-size:0.72rem; font-weight:600; padding:0.2rem 0.6rem; border-radius:6px; text-transform:uppercase; }
+        .rec-action.BUY { background:rgba(52,211,153,0.12); color:var(--income); }
+        .rec-action.SELL { background:rgba(248,113,113,0.12); color:var(--expense); }
+        .rec-reason { font-size:0.78rem; color:var(--text-secondary); margin-bottom:0.6rem; line-height:1.4; }
+        .rec-meta { font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-bottom:0.6rem; }
+        .confidence-bar-wrap { background:var(--bg-card); border-radius:20px; height:5px; margin-bottom:0.5rem; overflow:hidden; }
+        .confidence-bar { height:100%; border-radius:20px; background:var(--gold); transition:width 0.8s ease; }
+        .rec-actions { display:flex; gap:0.5rem; }
+        .btn-approve { flex:1; padding:0.45rem; background:transparent; border:1px solid var(--income); border-radius:8px; color:var(--income); font-size:0.75rem; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s; }
+        .btn-approve:hover { background:rgba(52,211,153,0.12); }
+        .btn-reject { flex:1; padding:0.45rem; background:transparent; border:1px solid var(--expense); border-radius:8px; color:var(--expense); font-size:0.75rem; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s; }
+        .btn-reject:hover { background:rgba(248,113,113,0.12); }
+        .rec-card.approved { border-color:var(--gold); opacity:0.7; }
+        .rec-card.approved .rec-actions { display:none; }
+        .rec-card.approved .rec-symbol::after { content:' ✓'; color:var(--gold); }
+        .rec-card.rejected { opacity:0.4; }
+        .rec-card.rejected .rec-actions { display:none; }
+
+        /* Target allocation */
+        .target-grid { display:flex; flex-direction:column; gap:0.6rem; }
+        .target-row { display:grid; grid-template-columns:100px 1fr 60px; gap:0.8rem; align-items:center; }
+        .target-symbol { font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--text-primary); }
+        .target-slider { -webkit-appearance:none; appearance:none; width:100%; height:4px; border-radius:4px; background:var(--border); outline:none; }
+        .target-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%; background:var(--gold); cursor:pointer; }
+        .target-pct { font-family:'JetBrains Mono',monospace; font-size:0.78rem; color:var(--text-secondary); text-align:right; }
+
+        .chart-row { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        .chart-wrap { background:var(--bg-base); border:1px solid var(--border); border-radius:10px; padding:1rem; }
+        .chart-wrap h4 { font-size:0.82rem; color:var(--text-muted); margin-bottom:0.8rem; text-align:center; }
+        .chart-container { position:relative; max-height:260px; }
+
+        .btn-analyze { padding:0.65rem 1.4rem; background:var(--gold); border:none; border-radius:8px; color:var(--bg-base); font-size:0.82rem; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; transition:all 0.2s; margin-bottom:1rem; }
+        .btn-analyze:hover { background:#d4a44a; }
+        .btn-save { padding:0.55rem 1.2rem; background:var(--bg-base); border:1px solid var(--border); border-radius:8px; color:var(--text-secondary); font-size:0.78rem; cursor:pointer; font-family:'Inter',sans-serif; margin-top:0.8rem; }
+        .btn-save:hover { border-color:var(--gold); color:var(--text-primary); }
+        .empty { text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem; }
+        .loading-dot { display:inline-block; animation:pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+        @media (max-width:768px) {
+            .investor-grid { grid-template-columns:1fr; }
+            .perf-stats { grid-template-columns:repeat(2,1fr); }
+            .chart-row { grid-template-columns:1fr; }
+            .sa-row { grid-template-columns:1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <span class="logo">Onyx</span>
+    <a href="/">Dashboard</a>
+    <a href="/add">Add</a>
+    <a href="/import">Import</a>
+    <a href="/portfolio" class="active">Portfolio</a>
+    <a href="/news">News</a>
+    <a href="/goals">Goals</a>
+    <a href="/report">Report</a>
+    <a href="/analytics">Analytics</a>
+    <a href="/budget">Budget</a>
+    <a href="/chat">AI Chat</a>
+    <a href="#" onclick="logout()" style="margin-left:auto" id="userLabel"></a>
+</nav>
+<main>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.6rem">
+        <a href="/portfolio" style="color:var(--gold);text-decoration:none">Portfolio</a>
+        <span style="margin:0 0.4rem">/</span>
+        <span style="color:var(--text-secondary)">AI Investor</span>
+    </div>
+    <div class="page-header" style="margin-bottom:1rem">
+        <h1>AI Investor</h1>
+        <p>Portfolio analysis, target allocation, and smart recommendations</p>
+    </div>
+
+    <!-- Performance Overview -->
+    <div class="section-box full-width" style="margin-bottom:1.5rem">
+        <h3>Performance Overview</h3>
+        <div id="perfLoading" class="empty"><span class="loading-dot">Fetching live prices...</span></div>
+        <div id="perfSection" style="display:none">
+            <div class="perf-stats">
+                <div class="perf-stat"><div class="label">Total Invested</div><div class="value" id="perfInvested">--</div></div>
+                <div class="perf-stat"><div class="label">Current Value</div><div class="value" id="perfCurrent">--</div></div>
+                <div class="perf-stat"><div class="label">Returns</div><div class="value" id="perfReturns">--</div></div>
+                <div class="perf-stat"><div class="label">Returns %</div><div class="value" id="perfReturnsPct">--</div></div>
+            </div>
+
+            <!-- Stock-by-stock analysis -->
+            <h3 style="margin-top:1.2rem">Holdings Analysis</h3>
+            <div class="stock-analysis" id="holdingsAnalysis"></div>
+
+            <div class="chart-row" style="margin-top:1.2rem">
+                <div class="chart-wrap">
+                    <h4>Current vs Target Allocation</h4>
+                    <div class="chart-container"><canvas id="allocationChart"></canvas></div>
+                </div>
+                <div class="chart-wrap">
+                    <h4>Portfolio Composition</h4>
+                    <div class="chart-container"><canvas id="pieChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="investor-grid">
+        <!-- Recommendations -->
+        <div class="section-box">
+            <h3>AI Recommendations</h3>
+            <button class="btn-analyze" onclick="analyzePortfolio()" id="btnAnalyze">Analyze Portfolio</button>
+            <div class="rec-list" id="recList">
+                <div class="empty">Click Analyze to get AI-powered recommendations</div>
+            </div>
+        </div>
+
+        <!-- Target Allocation -->
+        <div class="section-box">
+            <h3>Target Allocation</h3>
+            <p style="font-size:0.72rem;color:var(--text-muted);margin-bottom:0.8rem">Set your ideal portfolio weight per stock</p>
+            <div class="target-grid" id="targetGrid">
+                <div class="empty">Loading portfolio...</div>
+            </div>
+            <button class="btn-save" id="btnSaveTargets" onclick="saveTargets()" style="display:none">Save Targets</button>
+        </div>
+    </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+    requireAuth();
+    document.getElementById('userLabel').textContent = (localStorage.getItem('onyx_name') || 'Account') + ' ↗';
+
+    const CHART_COLORS = ['#c9963a','#34d399','#e2e8f0','#94a3b8','#64748b','#475569','#f87171','#60a5fa','#a78bfa','#fbbf24'];
+
+    function fmt(n) { return '₹' + Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+
+    let allocationChartInst = null;
+    let pieChartInst = null;
+    let portfolioData = []; // {symbol, name, qty, avgPrice, ltp, invested, current, pnl, pnlPct, weight}
+
+    // ── Fetch price from working portfolio endpoint ──
+    async function fetchPrice(symbol) {
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 8000);
+            const r = await fetch(`/api/portfolio/price/${encodeURIComponent(symbol)}`, {
+                headers: authHeaders(), signal: ctrl.signal
+            });
+            clearTimeout(timer);
+            const d = await r.json();
+            if (d.price && !isNaN(d.price) && d.price > 0) return d.price;
+        } catch {}
+        return null;
+    }
+
+    // ── Load everything ──
+    async function loadPerformance() {
+        const loading = document.getElementById('perfLoading');
+        const section = document.getElementById('perfSection');
+
+        try {
+            const stocksRes = await fetch('/api/portfolio/stocks', { headers: authHeaders() });
+            const stocks = await stocksRes.json();
+
+            if (!Array.isArray(stocks) || stocks.length === 0) {
+                loading.innerHTML = 'No stocks in portfolio. <a href="/portfolio" style="color:var(--gold)">Add stocks first</a>';
+                document.getElementById('targetGrid').innerHTML = '<div class="empty">Add stocks to your portfolio first</div>';
+                return;
+            }
+
+            // Fetch live prices in batches of 3 (avoids starving server threads)
+            loading.innerHTML = '<span class="loading-dot">Fetching prices for ' + stocks.length + ' stocks...</span>';
+
+            portfolioData = [];
+            let totalInvested = 0, totalCurrent = 0;
+
+            const priceResults = [];
+            for (let i = 0; i < stocks.length; i += 3) {
+                const batch = stocks.slice(i, i + 3);
+                loading.innerHTML = `<span class="loading-dot">Fetching prices ${i+1}-${Math.min(i+3, stocks.length)} of ${stocks.length}...</span>`;
+                const batchResults = await Promise.allSettled(
+                    batch.map(stock => fetchPrice(stock.symbol))
+                );
+                priceResults.push(...batchResults);
+            }
+
+            stocks.forEach((stock, i) => {
+                const ltp = priceResults[i].status === 'fulfilled' ? priceResults[i].value : null;
+                const invested = stock.qty * stock.avgPrice;
+                const current = ltp ? stock.qty * ltp : invested;
+                const pnl = current - invested;
+                const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+
+                portfolioData.push({
+                    symbol: stock.symbol, name: stock.name,
+                    qty: stock.qty, avgPrice: stock.avgPrice,
+                    ltp: ltp || stock.avgPrice,
+                    invested, current, pnl, pnlPct,
+                    hasPrice: ltp !== null
+                });
+
+                totalInvested += invested;
+                totalCurrent += current;
+            });
+
+            // Compute weights
+            portfolioData.forEach(s => {
+                s.weight = totalCurrent > 0 ? (s.current / totalCurrent) * 100 : 0;
+            });
+
+            // Show performance stats
+            loading.style.display = 'none';
+            section.style.display = 'block';
+
+            document.getElementById('perfInvested').textContent = fmt(totalInvested);
+            document.getElementById('perfCurrent').textContent = fmt(totalCurrent);
+
+            const returns = totalCurrent - totalInvested;
+            const returnsPct = totalInvested > 0 ? (returns / totalInvested) * 100 : 0;
+
+            const retEl = document.getElementById('perfReturns');
+            retEl.textContent = (returns >= 0 ? '+' : '-') + fmt(returns);
+            retEl.className = 'value ' + (returns >= 0 ? 'positive' : 'negative');
+
+            const pctEl = document.getElementById('perfReturnsPct');
+            pctEl.textContent = (returnsPct >= 0 ? '+' : '') + returnsPct.toFixed(2) + '%';
+            pctEl.className = 'value ' + (returnsPct >= 0 ? 'positive' : 'negative');
+
+            // Holdings analysis
+            renderHoldings();
+
+            // Charts
+            buildCharts();
+
+            // Target allocation
+            loadTargets(stocks);
+
+        } catch(e) {
+            console.error(e);
+            loading.innerHTML = '<span style="color:var(--expense)">Error: ' + e.message + '</span>';
+        }
+    }
+
+    function renderHoldings() {
+        const el = document.getElementById('holdingsAnalysis');
+        el.innerHTML = portfolioData.map(s => {
+            const sym = s.symbol.replace('.NS','').replace('.BO','');
+            return `<div class="sa-row">
+                <div><div class="sa-sym">${sym}</div><div class="sa-name">${s.name}</div></div>
+                <div><div class="sa-label">LTP</div><div class="sa-val">${s.hasPrice ? fmt(s.ltp) : '<span style="color:var(--text-muted)">N/A</span>'}</div></div>
+                <div><div class="sa-label">Invested</div><div class="sa-val">${fmt(s.invested)}</div></div>
+                <div><div class="sa-label">Current</div><div class="sa-val">${fmt(s.current)}</div></div>
+                <div><div class="sa-label">P&L</div><div class="sa-val" style="color:${s.pnl >= 0 ? 'var(--income)' : 'var(--expense)'}">${s.pnl >= 0 ? '+' : ''}${fmt(s.pnl)} (${s.pnlPct.toFixed(1)}%)</div></div>
+            </div>`;
+        }).join('');
+    }
+
+    function buildCharts() {
+        if (!portfolioData.length) return;
+
+        // Load targets for chart
+        const numStocks = portfolioData.length;
+        const defaultPct = Math.round(100 / numStocks);
+
+        const labels = portfolioData.map(s => s.symbol.replace('.NS','').replace('.BO',''));
+        const currentPcts = portfolioData.map(s => parseFloat(s.weight.toFixed(1)));
+
+        // Allocation bar chart
+        const ctx1 = document.getElementById('allocationChart');
+        if (allocationChartInst) allocationChartInst.destroy();
+        allocationChartInst = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label:'Current %', data:currentPcts, backgroundColor:'rgba(201,150,58,0.5)', borderColor:'rgba(201,150,58,0.9)', borderWidth:1, borderRadius:4 },
+                    { label:'Target %', data:labels.map(() => defaultPct), backgroundColor:'rgba(52,211,153,0.3)', borderColor:'rgba(52,211,153,0.7)', borderWidth:1, borderRadius:4 }
+                ]
+            },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                plugins: { legend:{ labels:{ color:'#8892a4', font:{size:10} } } },
+                scales: {
+                    x:{ grid:{color:'#1a1d22'}, ticks:{color:'#3d4450', font:{size:10}} },
+                    y:{ grid:{color:'#1a1d22'}, ticks:{color:'#3d4450', font:{size:10}, callback:v=>v+'%'} }
+                }
+            }
+        });
+
+        // Pie chart
+        const ctx2 = document.getElementById('pieChart');
+        if (pieChartInst) pieChartInst.destroy();
+        pieChartInst = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{ data:currentPcts, backgroundColor:CHART_COLORS, borderColor:'#07080a', borderWidth:3, hoverOffset:6 }]
+            },
+            options: {
+                cutout:'68%', responsive:true, maintainAspectRatio:false,
+                plugins: { legend:{ position:'bottom', labels:{ color:'#8892a4', font:{size:10}, padding:8 } },
+                    tooltip:{ callbacks:{ label:c=>' '+c.label+': '+c.raw.toFixed(1)+'%' } }
+                }
+            }
+        });
+    }
+
+    // ── Recommendations ──
+    async function loadRecommendations() {
+        try {
+            const res = await fetch('/api/investor/recommendations', { headers: authHeaders() });
+            const recs = await res.json();
+            renderRecs(Array.isArray(recs) ? recs : []);
+        } catch(e) { console.error(e); }
+    }
+
+    function renderRecs(recs) {
+        const el = document.getElementById('recList');
+        const pending = recs.filter(r => r.status === 'pending');
+        const resolved = recs.filter(r => r.status !== 'pending');
+
+        if (!recs.length) { el.innerHTML = '<div class="empty">Click Analyze to get AI-powered recommendations</div>'; return; }
+
+        el.innerHTML = [...pending, ...resolved].map(r => `
+            <div class="rec-card ${r.status} fade-in">
+                <div class="rec-header">
+                    <span class="rec-symbol">${r.symbol.replace('.NS','').replace('.BO','')}</span>
+                    <span class="rec-action ${r.action}">${r.action}</span>
+                </div>
+                <div class="rec-reason">${r.reason}</div>
+                <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${(r.confidence*100).toFixed(0)}%"></div></div>
+                <div class="rec-meta">Confidence: ${(r.confidence*100).toFixed(0)}% | Qty: ${r.target_qty} | Price: ${fmt(r.target_price)}</div>
+                <div class="rec-actions">
+                    <button class="btn-approve" onclick="approveRec(${r.id})">Approve</button>
+                    <button class="btn-reject" onclick="rejectRec(${r.id})">Reject</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function analyzePortfolio() {
+        const btn = document.getElementById('btnAnalyze');
+        btn.textContent = 'Analyzing...'; btn.disabled = true;
+        try {
+            const res = await fetch('/api/investor/analyze', { method:'POST', headers: authHeaders() });
+            const data = await res.json();
+            if (data.recommendations) renderRecs(data.recommendations);
+            else if (data.message) {
+                document.getElementById('recList').innerHTML = '<div class="empty">' + data.message + '</div>';
+            }
+        } catch(e) { console.error(e); }
+        finally { btn.textContent = 'Analyze Portfolio'; btn.disabled = false; }
+    }
+
+    async function approveRec(id) {
+        await fetch(`/api/investor/approve/${id}`, { method:'POST', headers: authHeaders() });
+        loadRecommendations();
+    }
+
+    async function rejectRec(id) {
+        await fetch(`/api/investor/reject/${id}`, { method:'POST', headers: authHeaders() });
+        loadRecommendations();
+    }
+
+    // ── Targets ──
+    async function loadTargets(stocks) {
+        if (!stocks || !stocks.length) return;
+        try {
+            const targetsRes = await fetch('/api/investor/targets', { headers: authHeaders() });
+            const targets = await targetsRes.json();
+            const targetMap = {};
+            if (Array.isArray(targets)) targets.forEach(t => { targetMap[t.symbol] = t.target_pct; });
+
+            const defaultPct = Math.round(100 / stocks.length);
+            const el = document.getElementById('targetGrid');
+
+            el.innerHTML = stocks.map(s => {
+                const pct = targetMap[s.symbol] !== undefined ? targetMap[s.symbol] : defaultPct;
+                const sym = s.symbol.replace('.NS','').replace('.BO','');
+                return `<div class="target-row">
+                    <span class="target-symbol">${sym}</span>
+                    <input type="range" class="target-slider" min="0" max="100" value="${pct}" data-symbol="${s.symbol}"
+                           oninput="this.parentElement.querySelector('.target-pct').textContent=this.value+'%'"/>
+                    <span class="target-pct">${pct}%</span>
+                </div>`;
+            }).join('');
+            document.getElementById('btnSaveTargets').style.display = 'inline-block';
+        } catch(e) { console.error(e); }
+    }
+
+    async function saveTargets() {
+        const sliders = document.querySelectorAll('.target-slider');
+        const targets = [];
+        sliders.forEach(s => { targets.push({ symbol: s.dataset.symbol, target_pct: parseFloat(s.value) }); });
+        await fetch('/api/investor/targets', { method:'POST', headers: authHeaders(), body: JSON.stringify(targets) });
+        const btn = document.getElementById('btnSaveTargets');
+        btn.textContent = 'Saved!'; btn.style.borderColor = 'var(--gold)'; btn.style.color = 'var(--gold)';
+        setTimeout(() => { btn.textContent = 'Save Targets'; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+    }
+
+    // ── Init ──
+    loadPerformance();
+    loadRecommendations();
+</script>
+</body>
+</html>

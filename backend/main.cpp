@@ -9,6 +9,8 @@
 #include "routes/news.h"
 #include "routes/goals.h"
 #include "routes/budget.h"
+#include "routes/investor.h"
+#include "routes/trader.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -23,6 +25,10 @@ static crow::response serveFile(const std::string& path, const std::string& cont
     ss << file.rdbuf();
     crow::response res(ss.str());
     res.add_header("Content-Type", contentType);
+    // Prevent browser caching so JS/HTML changes always take effect immediately
+    res.add_header("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.add_header("Pragma", "no-cache");
+    res.add_header("Expires", "0");
     return res;
 }
 
@@ -34,6 +40,9 @@ int main() {
     createPortfolioTables(db);
     createGoalsTable(db);
     createBudgetsTable(db);
+    createInvestorTables(db);
+    createAITraderTable(db);
+    createAISettingsTable(db);
     std::cout << "[DB] finance.db ready\n";
 
     crow::SimpleApp app;
@@ -81,6 +90,12 @@ int main() {
     CROW_ROUTE(app, "/budget")([]() {
         return serveFile("frontend/budget.html", "text/html");
     });
+    CROW_ROUTE(app, "/investor")([]() {
+        return serveFile("frontend/investor.html", "text/html");
+    });
+    CROW_ROUTE(app, "/trader")([]() {
+        return serveFile("frontend/trader.html", "text/html");
+    });
     CROW_ROUTE(app, "/portfolio_import.csv")([]() {
         return serveFile("frontend/portfolio_import.csv", "text/csv");
     });
@@ -94,6 +109,8 @@ int main() {
     setupNewsRoutes(app, db);
     setupGoalsRoutes(app, db);
     setupBudgetRoutes(app, db);
+    setupInvestorRoutes(app, db);
+    setupTraderRoutes(app, db);
 
     std::cout << "[Server] Running on http://localhost:8080\n";
     app.port(8080).multithreaded().run();

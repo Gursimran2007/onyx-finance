@@ -18,7 +18,16 @@ static std::string g_yfCookieFile = "/tmp/onyx_yf_cookies.txt";
 static std::string g_yfCrumb;
 static time_t      g_yfCrumbExpiry = 0;
 
-// ── Simple 30-minute in-memory cache for history responses ───────
+// ── NSE India session cookie jar ─────────────────────────────────
+static std::mutex  g_nseMutex;
+static std::string g_nseCookieFile = "/tmp/onyx_nse_cookies.txt";
+static time_t      g_nseSessionExpiry = 0;
+
+// ── 5-minute in-memory price cache (avoid hammering APIs) ────────
+static std::mutex g_priceCacheMutex;
+static std::map<std::string, std::pair<time_t, double>> g_priceCache;
+
+// ── 30-minute history cache ───────────────────────────────────────
 static std::mutex g_cacheMutex;
 static std::map<std::string, std::pair<time_t, std::string>> g_historyCache;
 
@@ -96,6 +105,63 @@ static std::string httpGetWithCookies(const std::string& url) {
         curl_easy_cleanup(curl);
     }
     return response;
+}
+
+// Generic cookie-jar GET (reusable for both NSE and Yahoo)
+static std::string httpGetWithCookieFile(const std::string& url,
+                                          const std::string& cookieFile,
+                                          const std::string& referer = "") {
+    CURL* curl = curl_easy_init();
+    std::string response;
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlWriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 12L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, YF_UA);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        curl_easy_setopt(curl, CURLOPT_COOKIEFILE, cookieFile.c_str());
+        curl_easy_setopt(curl, CURLOPT_COOKIEJAR,  cookieFile.c_str());
+        struct curl_slist* headers = nullptr;
+        headers = curl_slist_append(headers, "Accept: application/json, text/plain, */*");
+        headers = curl_slist_append(headers, "Accept-Language: en-US,en;q=0.9");
+        if (!referer.empty()) {
+            std::string ref = "Referer: " + referer;
+            headers = curl_slist_append(headers, ref.c_str());
+        }
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_perform(curl);
+        curl_slist_free_all(headers);
+        curl_easy_cleanup(curl);
+    }
+    return response;
+}
+
+// Warms up NSE India session cookie (needed for API calls)
+static void warmNSESession() {
+    std::lock_guard<std::mutex> lk(g_nseMutex);
+    if (time(nullptr) < g_nseSessionExpiry) return;
+    // Visit main NSE page to get session cookies
+    httpGetWithCookieFile("https://www.nseindia.com/", g_nseCookieFile,
+                          "https://www.nseindia.com/");
+    g_nseSessionExpiry = time(nullptr) + 3600; // 1-hour TTL
+    std::cout << "[Portfolio] NSE session initialized\n";
+}
+
+// Fetch price from NSE India (primary source for .NS symbols)
+static double fetchNSEPrice(const std::string& nseSymbol) {
+    warmNSESession();
+    std::string url = "https://www.nseindia.com/api/quote-equity?symbol=" + nseSymbol;
+    std::string raw = httpGetWithCookieFile(url, g_nseCookieFile, "https://www.nseindia.com/");
+    if (raw.empty()) return -1.0;
+    try {
+        auto parsed = json::parse(raw);
+        double price = parsed["priceInfo"]["lastPrice"].get<double>();
+        if (price > 0) return price;
+    } catch (...) {}
+    return -1.0;
 }
 
 // Returns valid Yahoo Finance crumb (refreshes session if expired)
@@ -263,68 +329,75 @@ void setupPortfolioRoutes(crow::SimpleApp& app, SQLite::Database& db) {
             return res;
         }
 
-        // --- Try NSE India first (for .NS symbols — no rate-limiting) ---
-        // Strip suffix: RELIANCE.NS → RELIANCE, RELIANCE.BO → RELIANCE
+        // --- Check 5-minute price cache first ---
+        {
+            std::lock_guard<std::mutex> lk(g_priceCacheMutex);
+            auto it = g_priceCache.find(symbol);
+            if (it != g_priceCache.end() && time(nullptr) < it->second.first) {
+                double cached = it->second.second;
+                json resp = {{"symbol", symbol}, {"price", cached}, {"currency", "INR"}, {"cached", true}};
+                crow::response res(resp.dump());
+                res.add_header("Content-Type", "application/json");
+                addCORS(res);
+                return res;
+            }
+        }
+
+        // --- Try NSE India (primary — works for all valid NSE symbols) ---
+        // Strip .NS / .BO suffix: RELIANCE.NS → RELIANCE
         std::string nseSymbol = symbol;
-        auto dotPos = nseSymbol.rfind('.');
-        if (dotPos != std::string::npos) nseSymbol = nseSymbol.substr(0, dotPos);
-        // Uppercase
-        for (auto& c : nseSymbol) c = toupper(c);
-
-        std::string nseUrl = "https://www.nseindia.com/api/quote-equity?symbol=" + nseSymbol;
-        // NSE requires Referer header
-        CURL* nseC = curl_easy_init();
-        std::string nseRaw;
-        if (nseC) {
-            curl_easy_setopt(nseC, CURLOPT_URL, nseUrl.c_str());
-            curl_easy_setopt(nseC, CURLOPT_WRITEFUNCTION, curlWriteCallback);
-            curl_easy_setopt(nseC, CURLOPT_WRITEDATA, &nseRaw);
-            curl_easy_setopt(nseC, CURLOPT_TIMEOUT, 10L);
-            curl_easy_setopt(nseC, CURLOPT_FOLLOWLOCATION, 1L);
-            curl_easy_setopt(nseC, CURLOPT_SSL_VERIFYPEER, 0L);
-            curl_easy_setopt(nseC, CURLOPT_SSL_VERIFYHOST, 0L);
-            struct curl_slist* nseHeaders = nullptr;
-            nseHeaders = curl_slist_append(nseHeaders, "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            nseHeaders = curl_slist_append(nseHeaders, "Referer: https://www.nseindia.com/");
-            nseHeaders = curl_slist_append(nseHeaders, "Accept: application/json, text/plain, */*");
-            curl_easy_setopt(nseC, CURLOPT_HTTPHEADER, nseHeaders);
-            curl_easy_perform(nseC);
-            curl_slist_free_all(nseHeaders);
-            curl_easy_cleanup(nseC);
+        {
+            auto dotPos = nseSymbol.rfind('.');
+            if (dotPos != std::string::npos) nseSymbol = nseSymbol.substr(0, dotPos);
+            for (auto& c : nseSymbol) c = toupper((unsigned char)c);
         }
 
-        try {
-            auto parsed = json::parse(nseRaw);
-            double price    = parsed["priceInfo"]["lastPrice"].get<double>();
-            std::string currency = "INR";
-            json resp = {{"symbol", symbol}, {"price", price}, {"currency", currency}};
+        double price = fetchNSEPrice(nseSymbol);
+
+        // --- Fallback: MoneyControl price API ---
+        if (price <= 0) {
+            try {
+                std::string mcUrl = "https://priceapi.moneycontrol.com/pricefeed/nse/equitycash/" + nseSymbol;
+                std::string mcRaw = httpGet(mcUrl);
+                if (!mcRaw.empty()) {
+                    auto mc = json::parse(mcRaw);
+                    std::string hp = mc["data"].value("HP", "");
+                    if (hp.empty()) hp = mc["data"].value("pricecurrent", "");
+                    if (!hp.empty()) price = std::stod(hp);
+                }
+            } catch (...) {}
+        }
+
+        // --- Fallback: Yahoo Finance v8 ---
+        if (price <= 0) {
+            try {
+                std::string yfUrl = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=1d";
+                std::string yfRaw = httpGet(yfUrl);
+                if (!yfRaw.empty()) {
+                    auto yf = json::parse(yfRaw);
+                    price = yf["chart"]["result"][0]["meta"]["regularMarketPrice"].get<double>();
+                }
+            } catch (...) {}
+        }
+
+        if (price > 0) {
+            // Cache it for 5 minutes
+            {
+                std::lock_guard<std::mutex> lk(g_priceCacheMutex);
+                g_priceCache[symbol] = { time(nullptr) + 300, price };
+            }
+            json resp = {{"symbol", symbol}, {"price", price}, {"currency", "INR"}};
             crow::response res(resp.dump());
             res.add_header("Content-Type", "application/json");
             addCORS(res);
             return res;
-        } catch (...) {
-            // NSE failed, fall back to Yahoo Finance
         }
 
-        // --- Fallback: Yahoo Finance ---
-        std::string url = "https://query1.finance.yahoo.com/v8/finance/chart/" + symbol + "?interval=1d&range=1d";
-        std::string raw = httpGet(url);
-
-        try {
-            auto parsed = json::parse(raw);
-            double price = parsed["chart"]["result"][0]["meta"]["regularMarketPrice"].get<double>();
-            std::string currency = parsed["chart"]["result"][0]["meta"].value("currency", "USD");
-            json resp = {{"symbol", symbol}, {"price", price}, {"currency", currency}};
-            crow::response res(resp.dump());
-            res.add_header("Content-Type", "application/json");
-            addCORS(res);
-            return res;
-        } catch (std::exception& e) {
-            crow::response res(502, std::string("{\"error\":\"failed to fetch price: ") + e.what() + "\"}");
-            res.add_header("Content-Type", "application/json");
-            addCORS(res);
-            return res;
-        }
+        // All sources failed
+        crow::response res(502, "{\"error\":\"price unavailable — check symbol is a valid NSE ticker (e.g. RELIANCE.NS)\"}");
+        res.add_header("Content-Type", "application/json");
+        addCORS(res);
+        return res;
     });
 
     // ---------- GET /api/portfolio/history/<symbol>?range=1y ----------

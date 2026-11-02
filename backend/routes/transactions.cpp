@@ -2,8 +2,34 @@
 #include "database/db.h"
 #include "models/transaction.h"
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cmath>
 
 using json = nlohmann::json;
+
+// Auto-update goals: recalculate saved_amount from net savings (income - expense)
+static void recomputeGoals(SQLite::Database& db, int userId) {
+    try {
+        Summary s = getSummary(db, userId);
+        double netSavings = s.balance; // income - expenses = available savings
+        if (netSavings < 0) netSavings = 0;
+
+        auto goals = getGoals(db, userId);
+        if (goals.empty()) return;
+
+        // Distribute net savings proportionally across goals by target amount
+        double totalTarget = 0;
+        for (auto& g : goals) totalTarget += g.value("targetAmount", 0.0);
+        if (totalTarget <= 0) return;
+
+        for (auto& g : goals) {
+            double target = g.value("targetAmount", 0.0);
+            double share  = (target / totalTarget) * netSavings;
+            double capped = std::min(share, target); // don't exceed target
+            updateGoalSaved(db, g["id"].get<int>(), capped);
+        }
+    } catch (...) {} // Silent — goals auto-update should never break transactions
+}
 
 static void addCORS(crow::response& res) {
     res.add_header("Access-Control-Allow-Origin",  "*");
@@ -81,6 +107,7 @@ void setupTransactionRoutes(crow::SimpleApp& app, SQLite::Database& db) {
                 addCORS(res); return res;
             }
             insertTransaction(db, t);
+            recomputeGoals(db, userId); // Auto-update goals
             crow::response res(201, "{\"status\":\"created\"}");
             res.add_header("Content-Type", "application/json");
             addCORS(res); return res;
@@ -109,6 +136,7 @@ void setupTransactionRoutes(crow::SimpleApp& app, SQLite::Database& db) {
             addCORS(res); return res;
         }
         deleteTransaction(db, id, userId);
+        recomputeGoals(db, userId); // Auto-update goals
         crow::response res(200, "{\"status\":\"deleted\"}");
         res.add_header("Content-Type", "application/json");
         addCORS(res); return res;

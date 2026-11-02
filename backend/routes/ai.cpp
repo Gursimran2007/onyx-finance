@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <stdexcept>
+#include <map>
 
 using json = nlohmann::json;
 
@@ -17,7 +18,8 @@ static size_t writeCallback(char* ptr, size_t size, size_t nmemb, std::string* d
 // ---- Call Groq API (free tier, OpenAI-compatible) ----
 static std::string callGroq(const std::string& userMessage) {
     const char* apiKey = std::getenv("GROQ_API_KEY");
-    if (!apiKey) throw std::runtime_error("GROQ_API_KEY not set");
+    if (!apiKey || std::string(apiKey).empty())
+        throw std::runtime_error("AI Chat requires a GROQ_API_KEY. Get a free key at console.groq.com and restart the server with: GROQ_API_KEY=your_key ./build/finance_app");
 
     // Groq uses OpenAI-compatible format
     json payload = {
@@ -112,12 +114,38 @@ void setupAIRoutes(crow::SimpleApp& app, SQLite::Database& db) {
             auto txns   = getRecentTransactions(db, userId, 30);
             auto context = buildContext(txns);
 
+            // Compute quick summary stats for context
+            double totalInc = 0, totalExp = 0;
+            std::map<std::string, double> catSpend;
+            for (auto& t : txns) {
+                if (t.type == "income")  totalInc += t.amount;
+                else { totalExp += t.amount; catSpend[t.category] += t.amount; }
+            }
+            std::string catBreakdown;
+            for (auto& [cat, amt] : catSpend)
+                catBreakdown += "  - " + cat + ": ₹" + std::to_string((int)amt) + "\n";
+
             std::string prompt =
-                context +
-                "\nUser question: " + question +
-                "\n\nYou are a personal finance assistant. "
-                "Answer concisely and give actionable advice. "
-                "Use bullet points where helpful.";
+                "You are **Onyx AI** — an expert Indian personal finance advisor built into the Onyx finance app.\n\n"
+                "## USER'S FINANCIAL SNAPSHOT (last 30 transactions)\n"
+                "- Total Income: ₹" + std::to_string((int)totalInc) + "\n"
+                "- Total Expenses: ₹" + std::to_string((int)totalExp) + "\n"
+                "- Net Savings: ₹" + std::to_string((int)(totalInc - totalExp)) + "\n"
+                "- Savings Rate: " + (totalInc > 0 ? std::to_string((int)((totalInc - totalExp) / totalInc * 100)) : "0") + "%\n"
+                "\n## SPENDING BY CATEGORY\n" + catBreakdown +
+                "\n## RAW TRANSACTIONS\n" + context +
+                "\n## USER QUESTION\n" + question +
+                "\n\n## INSTRUCTIONS\n"
+                "1. Answer in **structured format** using headers (##), bullet points, and bold for key figures\n"
+                "2. Always use ₹ (Indian Rupees) — never $\n"
+                "3. Reference specific transactions/categories from the data above\n"
+                "4. Give **actionable, specific advice** (not generic)\n"
+                "5. If asked about budgeting, suggest exact ₹ amounts per category based on their spending patterns\n"
+                "6. If asked about tax, use Indian tax slabs (new regime) and mention Section 80C, 80D, HRA where relevant\n"
+                "7. If asked about the app, explain Onyx features: Dashboard, Import (CSV/SMS/Portfolio), Portfolio tracker, News, Goals, Budget, Analytics, Report, AI Trader, AI Investor\n"
+                "8. NEVER recommend specific stocks or guarantee returns. Say 'this is not financial advice' for investment questions\n"
+                "9. Keep responses concise (under 300 words) but thorough\n"
+                "10. Use a friendly, direct tone — like a knowledgeable friend, not a formal advisor\n";
 
             std::string reply = callGroq(prompt);
 

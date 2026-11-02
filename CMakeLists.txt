@@ -36,6 +36,8 @@ add_executable(finance_app
     backend/routes/news.cpp
     backend/routes/goals.cpp
     backend/routes/budget.cpp
+    backend/routes/investor.cpp
+    backend/routes/trader.cpp
 )
 
 target_link_libraries(finance_app

@@ -356,3 +356,5 @@ void deleteBudget(SQLite::Database& db, int budgetId, int userId) {
     q.bind(2, userId);
     q.exec();
 }
+
+// AI Investor tables are created in investor.cpp

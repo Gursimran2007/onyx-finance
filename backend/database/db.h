@@ -55,3 +55,6 @@ void createBudgetsTable(SQLite::Database& db);
 void upsertBudget(SQLite::Database& db, int userId, const std::string& category, double monthlyLimit);
 std::vector<nlohmann::json> getBudgets(SQLite::Database& db, int userId, const std::string& currentMonth);
 void deleteBudget(SQLite::Database& db, int budgetId, int userId);
+
+// AI Investor
+void createInvestorTables(SQLite::Database& db);

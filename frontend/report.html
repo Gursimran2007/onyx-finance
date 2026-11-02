@@ -149,24 +149,46 @@
     let allTxns = [];
 
     async function loadData() {
+        const tbody = document.getElementById('repTxnBody');
         try {
             const token = localStorage.getItem('onyx_token');
-            const res = await fetch('/api/transactions?_=' + Date.now(), {
-                headers: { 'Authorization': 'Bearer ' + token, 'Cache-Control': 'no-cache' }
+            if (!token) { window.location.href = '/login'; return; }
+
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 12000);
+
+            const res = await fetch('/api/transactions', {
+                headers: authHeaders(),
+                signal: ctrl.signal
             });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            allTxns = await res.json();
-            if (!Array.isArray(allTxns)) allTxns = [];
-            const firstMonth = populateMonths();
-            if (firstMonth) renderReport(firstMonth);
-            else {
-                document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">No transactions yet. <a href="/import" style="color:var(--gold)">Import some →</a></td></tr>';
+            clearTimeout(timer);
+
+            if (res.status === 401) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:var(--expense)">Session expired. <a href="/login" style="color:var(--gold)">Log in again →</a></td></tr>';
+                return;
+            }
+            if (!res.ok) throw new Error('Server returned HTTP ' + res.status);
+
+            const data = await res.json();
+            allTxns = Array.isArray(data) ? data : [];
+
+            if (allTxns.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No transactions yet. <a href="/import" style="color:var(--gold)">Import some →</a></td></tr>';
                 document.getElementById('repIncome').textContent = '₹0';
                 document.getElementById('repExpenses').textContent = '₹0';
                 document.getElementById('repSaved').textContent = '₹0';
+                document.getElementById('txnCount').textContent = '0';
+                document.getElementById('monthSelect').innerHTML = '<option value="">No data</option>';
+                return;
+            }
+
+            const firstMonth = populateMonths();
+            if (firstMonth) {
+                renderReport(firstMonth);
             }
         } catch(e) {
-            document.getElementById('repTxnBody').innerHTML = '<tr><td colspan="4" class="empty-state">Could not load — ' + e.message + '</td></tr>';
+            const msg = e.name === 'AbortError' ? 'Request timed out — server may be busy. Refresh to retry.' : e.message;
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state" style="color:var(--expense)">Error: ' + msg + '<br><br><a href="/login" style="color:var(--gold)">Try logging in again →</a></td></tr>';
         }
     }
 

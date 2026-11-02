@@ -16,8 +16,11 @@ function logout() {
 }
 
 async function fetchTransactions() {
-    try { return await (await fetch(`${API}/api/transactions`, { headers: authHeaders() })).json(); }
-    catch { return []; }
+    try {
+        const res = await fetch(`${API}/api/transactions`, { headers: authHeaders() });
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+    } catch { return []; }
 }
 async function fetchSummary() {
     try { return await (await fetch(`${API}/api/summary`, { headers: authHeaders() })).json(); }
@@ -55,17 +58,22 @@ function fmt(n) {
 
 const CHART_COLORS = ['#e2e8f0','#94a3b8','#64748b','#475569','#334155','#1e293b','#f8fafc','#cbd5e1'];
 
+let _donutChartInst = null;
 function buildDonut(txns) {
     const ctx = document.getElementById('donutChart');
-    if (!ctx) return;
+    if (!ctx) { console.warn('[Donut] canvas not found'); return; }
+    if (typeof Chart === 'undefined') { console.warn('[Donut] Chart.js not loaded'); return; }
+    if (_donutChartInst) { _donutChartInst.destroy(); _donutChartInst = null; }
+    if (!Array.isArray(txns)) { console.warn('[Donut] txns not array'); return; }
     const expenses = txns.filter(t => t.type === 'expense');
     const byCategory = {};
     expenses.forEach(t => { byCategory[t.category] = (byCategory[t.category] || 0) + t.amount; });
     const labels = Object.keys(byCategory);
     const data   = Object.values(byCategory);
-    if (!labels.length) return;
+    if (!labels.length) { console.warn('[Donut] no expense categories'); return; }
+    console.log('[Donut] rendering', labels.length, 'categories');
 
-    new Chart(ctx, {
+    _donutChartInst = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels,
@@ -105,10 +113,13 @@ function buildDonut(txns) {
 let _lineChartInst = null;
 function buildLine(txns) {
     const ctx = document.getElementById('lineChart');
-    if (!ctx) return;
+    if (!ctx) { console.warn('[Line] canvas not found'); return; }
+    if (typeof Chart === 'undefined') { console.warn('[Line] Chart.js not loaded'); return; }
     if (_lineChartInst) { _lineChartInst.destroy(); _lineChartInst = null; }
+    if (!Array.isArray(txns)) { console.warn('[Line] txns not array'); return; }
 
     const expenses = txns.filter(t => t.type === 'expense');
+    console.log('[Line] expenses:', expenses.length);
 
     // Group by MONTH (YYYY-MM) — individual days produce hundreds of noisy points
     const byMonth = {};
@@ -163,6 +174,7 @@ function buildLine(txns) {
 
 async function loadDashboard() {
     const [txns, summary] = await Promise.all([fetchTransactions(), fetchSummary()]);
+    console.log('[Dashboard] txns:', Array.isArray(txns) ? txns.length : 'not-array', 'summary:', summary);
 
     document.getElementById('totalIncome').textContent   = fmt(summary.totalIncome);
     document.getElementById('totalExpenses').textContent = fmt(summary.totalExpenses);
@@ -187,8 +199,8 @@ async function loadDashboard() {
             </tr>`).join('');
     }
 
-    buildDonut(txns);
-    buildLine(txns);
+    try { buildDonut(txns); } catch(e) { console.error('[Dashboard] donut error:', e); }
+    try { buildLine(txns); } catch(e) { console.error('[Dashboard] line error:', e); }
 }
 
 async function handleDelete(id) {
